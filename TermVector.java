@@ -9,12 +9,12 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
-
 import org.apache.lucene.index.DocsAndPositionsEnum;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
+
+import java.io.IOException;
 
 public class TermVector {
 
@@ -22,14 +22,19 @@ public class TermVector {
    * Class variables.
    */
   Terms luceneTerms;
+
   int[] positions;
+
   String[] stems;
+
   int[] stemsFreq;
+
   Term[] terms;
 
   /**
-   *  Constructor.  Create a TermVector for a field in a document.
-   *  @return {@link TermVector}
+   * Constructor.  Create a TermVector for a field in a document.
+   *
+   * @return {@link TermVector}
    */
   public TermVector(int docId, String fieldName) throws IOException {
 
@@ -65,8 +70,9 @@ public class TermVector {
 
       ithPositions.nextDoc(); /* Initialize iPositions */
 
-      for (int j = 0; j < ithPositions.freq() - 1; j++)
+      for (int j = 0; j < ithPositions.freq() - 1; j++) {
         ithPositions.nextPosition();
+      }
 
       positionsLength = Math.max(positionsLength, ithPositions.nextPosition());
     }
@@ -84,62 +90,71 @@ public class TermVector {
 
       ithPositions.nextDoc(); /* Initialize iPositions */
 
-      for (int j = 0; j < ithPositions.freq(); j++)
+      for (int j = 0; j < ithPositions.freq(); j++) {
         positions[ithPositions.nextPosition()] = i + 1;
+      }
     }
   }
 
   /**
-   *  Get the number of positions in this field (the length of the
-   *  field). If positions are not stored, it returns 0.
-   *  @return The number of positionsin this field (the field length).
+   * Get the number of positions in this field (the length of the
+   * field). If positions are not stored, it returns 0.
+   *
+   * @return The number of positionsin this field (the field length).
    */
   public int positionsLength() {
     return this.positions.length;
   }
 
   /**
-   *  Return the index of the stem that occurred at position i in the
-   *  document.  If positions are not stored, it returns -1.
-   *  @param i A position in the document.
-   *  @return Index of the stem.
+   * Return the index of the stem that occurred at position i in the
+   * document.  If positions are not stored, it returns -1.
+   *
+   * @param i A position in the document.
+   * @return Index of the stem.
    */
   public int stemAt(int i) {
-    if (i < positions.length)
+    if (i < positions.length) {
       return positions[i];
-    else
+    } else {
       return -1;
+    }
   }
 
   /**
-   *  Get the frequency of the n'th stem in the current doc, or -1 if
-   *  the index is invalid. The frequency for stopwords (i=0) is not
-   *  stored (0 is returned).
-   *  @param i Index of the stem
-   *  @return The stem frequency (tf)
+   * Get the frequency of the n'th stem in the current doc, or -1 if
+   * the index is invalid. The frequency for stopwords (i=0) is not
+   * stored (0 is returned).
+   *
+   * @param i Index of the stem
+   * @return The stem frequency (tf)
    */
   public int stemFreq(int i) {
-    if (i < stemsFreq.length)
+    if (i < stemsFreq.length) {
       return stemsFreq[i];
-    else
+    } else {
       return -1;
+    }
   }
 
   /**
-   *  Get the string for the i'th stem, or null if the index is invalid.
-   *  @param i Index of the stem.
-   *  @return The stem string.
+   * Get the string for the i'th stem, or null if the index is invalid.
+   *
+   * @param i Index of the stem.
+   * @return The stem string.
    */
   public String stemString(int i) {
-    if (i < stems.length)
+    if (i < stems.length) {
       return stems[i];
-    else
+    } else {
       return null;
+    }
   }
 
   /**
    * The number of unique stems in this field.
-   *  @return The number of unique stems in this field.
+   *
+   * @return The number of unique stems in this field.
    */
   public int stemsLength() {
     return this.stems.length;
@@ -147,6 +162,7 @@ public class TermVector {
 
   /**
    * Returns ctf of the i'th stem.
+   *
    * @param i Index of the stem.
    * @return ctf of the stem.
    */
@@ -156,6 +172,7 @@ public class TermVector {
 
   /**
    * Returns the df of the i'th stem.
+   *
    * @param i Index of the stem.
    * @return cft of the stem.
    */

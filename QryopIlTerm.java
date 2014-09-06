@@ -8,28 +8,31 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
+import java.io.IOException;
 
 public class QryopIlTerm extends QryopIl {
 
   private String term;
+
   private String field;
 
   /**
-   *  Constructor.  The term is assumed to match the body field.
-   *  @param t A term string.
-   *  @return @link{QryopIlTerm} A TERM query operator.
+   * Constructor.  The term is assumed to match the body field.
+   *
+   * @param t A term string.
+   * @return @link{QryopIlTerm} A TERM query operator.
    */
   public QryopIlTerm(String t) {
     this.term = t;
-    this.field = "body";	// Default field if none is specified.
+    this.field = "body";  // Default field if none is specified.
   }
 
   /**
-   *  Constructor.  The term matches in the specified field.
-   *  @param t A term string.
-   *  @param f A field name.
-   *  @return @link{QryopIlTerm} A TERM query operator.
+   * Constructor.  The term matches in the specified field.
+   *
+   * @param t A term string.
+   * @param f A field name.
+   * @return @link{QryopIlTerm} A TERM query operator.
    */
   public QryopIlTerm(String t, String f) {
     this.term = t;
@@ -43,14 +46,15 @@ public class QryopIlTerm extends QryopIl {
    *  @param {q} q The query argument (query operator) to append.
    *  @return void
    */
-  public void add (Qryop q) {
+  public void add(Qryop q) {
   }
 
   /**
-   *  Evaluates the query operator and returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator and returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
   public QryResult evaluate(RetrievalModel r) throws IOException {
     QryResult result = new QryResult();
@@ -62,7 +66,7 @@ public class QryopIlTerm extends QryopIl {
    *  Return a string version of this query operator.  
    *  @return The string version of this query operator.
    */
-  public String toString(){
+  public String toString() {
     return (this.term + "." + this.field);
   }
 }

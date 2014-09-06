@@ -4,46 +4,51 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.ListIterator;
 
 public class QryopSlAnd extends QryopSl {
 
   /**
-   *  It is convenient for the constructor to accept a variable number
-   *  of arguments. Thus new QryopSlAnd (arg1, arg2, arg3, ...).
-   *  @param q A query argument (a query operator).
+   * It is convenient for the constructor to accept a variable number
+   * of arguments. Thus new QryopSlAnd (arg1, arg2, arg3, ...).
+   *
+   * @param q A query argument (a query operator).
    */
   public QryopSlAnd(Qryop... q) {
-    for (int i = 0; i < q.length; i++)
+    for (int i = 0; i < q.length; i++) {
       this.args.add(q[i]);
+    }
   }
 
   /**
-   *  Appends an argument to the list of query operator arguments.  This
-   *  simplifies the design of some query parsing architectures.
-   *  @param {q} q The query argument (query operator) to append.
-   *  @return void
-   *  @throws IOException
+   * Appends an argument to the list of query operator arguments.  This
+   * simplifies the design of some query parsing architectures.
+   *
+   * @param {q} q The query argument (query operator) to append.
+   * @return void
+   * @throws IOException
    */
-  public void add (Qryop a) {
+  public void add(Qryop a) {
     this.args.add(a);
   }
 
   /**
-   *  Evaluates the query operator, including any child operators and
-   *  returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator, including any child operators and
+   * returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
   public QryResult evaluate(RetrievalModel r) throws IOException {
 
-    if (r instanceof RetrievalModelUnrankedBoolean)
+    if (r instanceof RetrievalModelUnrankedBoolean) {
       return evaluateBoolean(r);
-    else if (r instanceof RetrievalModelRankedBoolean)
+    } else if (r instanceof RetrievalModelRankedBoolean) {
       return evaluateRankedBoolean(r);
+    }
 
     return null;
   }
@@ -56,11 +61,7 @@ public class QryopSlAnd extends QryopSl {
    *  @param docid The internal id of the document that needs a default score.
    *  @return The default score.
    */
-  public double getDefaultScore (RetrievalModel r, long docid) throws IOException {
-
-    if (r instanceof RetrievalModelUnrankedBoolean)
-      return (0.0);
-
+  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
     return 0.0;
   }
 
@@ -68,24 +69,26 @@ public class QryopSlAnd extends QryopSl {
    *  Return a string version of this query operator.  
    *  @return The string version of this query operator.
    */
-  public String toString(){
-    
-    String result = new String ();
+  public String toString() {
 
-    for (int i=0; i<this.args.size(); i++)
+    String result = new String();
+
+    for (int i = 0; i < this.args.size(); i++) {
       result += this.args.get(i).toString() + " ";
+    }
 
     return ("#AND( " + result + ")");
   }
 
   /**
-   *  Evaluates the query operator for boolean retrieval models,
-   *  including any child operators and returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator for boolean retrieval models,
+   * including any child operators and returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
-  private QryResult evaluateBoolean (RetrievalModel r) throws IOException {
+  private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
 
     //  Initialization
 
@@ -130,14 +133,15 @@ public class QryopSlAnd extends QryopSl {
         DaaTPtr ptrj = this.daatPtrs.get(j);
 
         while (true) {
-          if (ptrj.nextDoc >= ptrj.scoreList.scores.size())
+          if (ptrj.nextDoc >= ptrj.scoreList.scores.size()) {
             break EVALUATEDOCUMENTS;    // No more docs can match
-          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid)
+          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue EVALUATEDOCUMENTS;  // The ptr0docid can't match.
-          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid)
+          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid) {
             ptrj.nextDoc++;      // Not yet at the right doc.
-          else
+          } else {
             break;        // ptrj matches ptr0Docid
+          }
         }
       }
 
@@ -151,13 +155,14 @@ public class QryopSlAnd extends QryopSl {
   }
 
   /**
-   *  Evaluates the query operator for ranked boolean retrieval models,
-   *  including any child operators and returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator for ranked boolean retrieval models,
+   * including any child operators and returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
-  private QryResult evaluateRankedBoolean (RetrievalModel r) throws IOException {
+  private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
 
@@ -186,19 +191,21 @@ public class QryopSlAnd extends QryopSl {
         DaaTPtr ptrj = this.daatPtrs.get(j);
 
         while (true) {
-          if (ptrj.nextDoc >= ptrj.scoreList.scores.size())
+          if (ptrj.nextDoc >= ptrj.scoreList.scores.size()) {
             break TRAVERSE_DOC_IN_PTR0;    // No more docs can match
-          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid)
+          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue TRAVERSE_DOC_IN_PTR0;  // The ptr0docid can't match.
-          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid)
+          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid) {
             ptrj.nextDoc++;      // Not yet at the right doc.
-          else
+          } else {
             break;        // ptrj matches ptr0Docid
+          }
         }
 
         double ptrjScore = ptrj.scoreList.getDocidScore(ptrj.nextDoc);
-        if (ptrjScore < currScore)
+        if (ptrjScore < currScore) {
           currScore = ptrjScore;
+        }
       }
       result.docScores.add(ptr0Docid, currScore);
     }

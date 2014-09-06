@@ -9,8 +9,7 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
 
 public abstract class QryopSl extends Qryop {
 
@@ -29,8 +28,9 @@ public abstract class QryopSl extends Qryop {
       //  If this argument doesn't return ScoreLists, wrap it
       //  in a #SCORE operator.
 
-      if (!QryopSl.class.isInstance(this.args.get(i)))
+      if (!QryopSl.class.isInstance(this.args.get(i))) {
         this.args.set(i, new QryopSlScore(this.args.get(i)));
+      }
 
       DaaTPtr ptri = new DaaTPtr();
       ptri.invList = null;

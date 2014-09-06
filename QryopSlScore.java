@@ -8,8 +8,8 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.Iterator;
 
 public class QryopSlScore extends QryopSl {
 
@@ -53,10 +53,11 @@ public class QryopSlScore extends QryopSl {
    */
   public QryResult evaluate(RetrievalModel r) throws IOException {
 
-    if (r instanceof RetrievalModelUnrankedBoolean)
+    if (r instanceof RetrievalModelUnrankedBoolean) {
       return (evaluateBoolean(r));
-    else if (r instanceof RetrievalModelRankedBoolean)
+    } else if (r instanceof RetrievalModelRankedBoolean) {
       return evaluateRankedBoolean(r);
+    }
 
     return null;
   }
@@ -90,8 +91,9 @@ public class QryopSlScore extends QryopSl {
     // The SCORE operator should not return a populated inverted list.
     // If there is one, replace it with an empty inverted list.
 
-    if (result.invertedList.df > 0)
+    if (result.invertedList.df > 0) {
       result.invertedList = new InvList();
+    }
 
     return result;
   }
@@ -112,12 +114,13 @@ public class QryopSlScore extends QryopSl {
 
     for (int i = 0; i < result.invertedList.df; i++) {
       int docId = result.invertedList.postings.get(i).docid,
-          tf = result.invertedList.postings.get(i).tf;
+              tf = result.invertedList.postings.get(i).tf;
       result.docScores.add(docId, tf);
     }
 
-    if (result.invertedList.df > 0)
+    if (result.invertedList.df > 0) {
       result.invertedList = new InvList();
+    }
 
     return result;
   }
@@ -132,8 +135,9 @@ public class QryopSlScore extends QryopSl {
    */
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
 
-    if (r instanceof RetrievalModelUnrankedBoolean)
+    if (r instanceof RetrievalModelUnrankedBoolean) {
       return (0.0);
+    }
 
     return 0.0;
   }
@@ -147,8 +151,9 @@ public class QryopSlScore extends QryopSl {
 
     String result = new String();
 
-    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); )
+    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
       result += (i.next().toString() + " ");
+    }
 
     return ("#SCORE( " + result + ")");
   }

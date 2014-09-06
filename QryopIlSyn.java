@@ -8,18 +8,22 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 
-public class QryopIlSyn extends QryopIl {
+public class QryopIlSyn extends QryopSl {
 
   /**
    * It is convenient for the constructor to accept a variable number
    * of arguments. Thus new QryopIlSyn (arg1, arg2, arg3, ...).
    */
   public QryopIlSyn(Qryop... q) {
-    for (int i = 0; i < q.length; i++)
+    for (int i = 0; i < q.length; i++) {
       this.args.add(q[i]);
+    }
   }
 
   /**
@@ -109,34 +113,12 @@ public class QryopIlSyn extends QryopIl {
 
     for (int i = 0; i < this.daatPtrs.size(); i++) {
       DaaTPtr ptri = this.daatPtrs.get(i);
-      if (nextDocid > ptri.invList.getDocid(ptri.nextDoc))
+      if (nextDocid > ptri.invList.getDocid(ptri.nextDoc)) {
         nextDocid = ptri.invList.getDocid(ptri.nextDoc);
+      }
     }
 
     return (nextDocid);
-  }
-
-  /**
-   * syntaxCheckArgResults does syntax checking that can only be done
-   * after query arguments are evaluated.
-   *
-   * @param ptrs A list of DaaTPtrs for this query operator.
-   * @return True if the syntax is valid, false otherwise.
-   */
-  public Boolean syntaxCheckArgResults(List<DaaTPtr> ptrs) {
-
-    for (int i = 0; i < this.args.size(); i++) {
-
-      if (!(this.args.get(i) instanceof QryopIl))
-        QryEval.fatalError("Error:  Invalid argument in " +
-                this.toString());
-      else if ((i > 0) &&
-              (!ptrs.get(i).invList.field.equals(ptrs.get(0).invList.field)))
-        QryEval.fatalError("Error:  Arguments must be in the same field:  " +
-                this.toString());
-    }
-
-    return true;
   }
 
   /*
@@ -147,9 +129,39 @@ public class QryopIlSyn extends QryopIl {
 
     String result = new String();
 
-    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); )
+    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
       result += (i.next().toString() + " ");
+    }
 
     return ("#SYN( " + result + ")");
+  }
+
+  @Override
+  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
+    return 0;
+  }
+
+  /**
+   * syntaxCheckArgResults does syntax checking that can only be done
+   * after query arguments are evaluated.
+   *
+   * @param ptrs A list of DaaTPtrs for this query operator.
+   * @return True if the syntax is valid, false otherwise.
+   */
+  private Boolean syntaxCheckArgResults(List<DaaTPtr> ptrs) {
+
+    for (int i = 0; i < this.args.size(); i++) {
+
+      if (!(this.args.get(i) instanceof QryopIl)) {
+        QryEval.fatalError("Error:  Invalid argument in " +
+                this.toString());
+      } else if ((i > 0) &&
+              (!ptrs.get(i).invList.field.equals(ptrs.get(0).invList.field))) {
+        QryEval.fatalError("Error:  Arguments must be in the same field:  " +
+                this.toString());
+      }
+    }
+
+    return true;
   }
 }

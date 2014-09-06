@@ -9,17 +9,19 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.io.*;
-import java.util.*;
-
 import org.apache.lucene.analysis.Analyzer.TokenStreamComponents;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.index.*;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
+
+import java.io.*;
+import java.util.*;
 
 public class QryEval {
 
@@ -94,8 +96,7 @@ public class QryEval {
     } catch (Exception e) {
       e.printStackTrace();
       fatalError("Error: Read query file failed.");
-    }
-    finally {
+    } finally {
       queryFileReader.close();
     }
 
@@ -115,7 +116,6 @@ public class QryEval {
       queryResultList.add(r);
       printResults(query, r);
     }
-
 
     // Create the trec_eval output.
     BufferedWriter writer = null;
@@ -257,8 +257,9 @@ public class QryEval {
           processing back to the higher-level operator.
         */
         stack.pop();
-        if (stack.empty())
+        if (stack.empty()) {
           break;
+        }
         Qryop arg = currentOp;
         currentOp = stack.peek();
         currentOp.add(arg);
@@ -271,8 +272,9 @@ public class QryEval {
         }
 
         String[] tokenizeResult = tokenizeQuery(token);
-        if (tokenizeResult.length != 0)
+        if (tokenizeResult.length != 0) {
           currentOp.add(new QryopIlTerm(tokenizeResult[0], tokenField));
+        }
       }
     }
 

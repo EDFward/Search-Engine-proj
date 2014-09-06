@@ -7,13 +7,15 @@ import java.util.Set;
 public class QryopSlOr extends QryopSl {
 
   /**
-   *  It is convenient for the constructor to accept a variable number
-   *  of arguments. Thus new QryopSlOr (arg1, arg2, arg3, ...).
-   *  @param q A query argument (a query operator).
+   * It is convenient for the constructor to accept a variable number
+   * of arguments. Thus new QryopSlOr (arg1, arg2, arg3, ...).
+   *
+   * @param q A query argument (a query operator).
    */
   public QryopSlOr(Qryop... q) {
-    for (int i = 0; i < q.length; i++)
+    for (int i = 0; i < q.length; i++) {
       this.args.add(q[i]);
+    }
   }
 
   @Override
@@ -22,11 +24,12 @@ public class QryopSlOr extends QryopSl {
   }
 
   /**
-   *  Appends an argument to the list of query operator arguments.  This
-   *  simplifies the design of some query parsing architectures.
-   *  @param {q} q The query argument (query operator) to append.
-   *  @return void
-   *  @throws IOException
+   * Appends an argument to the list of query operator arguments.  This
+   * simplifies the design of some query parsing architectures.
+   *
+   * @param {q} q The query argument (query operator) to append.
+   * @return void
+   * @throws IOException
    */
   @Override
   public void add(Qryop q) throws IOException {
@@ -34,52 +37,58 @@ public class QryopSlOr extends QryopSl {
   }
 
   /**
-   *  Evaluates the query operator, including any child operators and
-   *  returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator, including any child operators and
+   * returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
   @Override
   public QryResult evaluate(RetrievalModel r) throws IOException {
-    if (r instanceof RetrievalModelUnrankedBoolean)
-      return (evaluateBoolean (r));
-    else if (r instanceof RetrievalModelRankedBoolean)
+    if (r instanceof RetrievalModelUnrankedBoolean) {
+      return (evaluateBoolean(r));
+    } else if (r instanceof RetrievalModelRankedBoolean) {
       return evaluateRankedBoolean(r);
+    }
 
     return null;
   }
 
   @Override
   public String toString() {
-    String result = new String ();
+    String result = new String();
 
-    for (Qryop arg : this.args)
+    for (Qryop arg : this.args) {
       result += arg.toString() + " ";
+    }
 
     return ("#OR( " + result + ")");
   }
 
   /**
-   *  Evaluates the query operator for boolean retrieval models,
-   *  including any child operators and returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator for boolean retrieval models,
+   * including any child operators and returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
-  private QryResult evaluateBoolean (RetrievalModel r) throws IOException {
+  private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
     Set<Integer> docidSet = new HashSet<Integer>();
 
     for (DaaTPtr p : this.daatPtrs) {
       int docSize = p.scoreList.scores.size();
-      for (int i = 0; i < docSize; ++i)
+      for (int i = 0; i < docSize; ++i) {
         docidSet.add(p.scoreList.getDocid(i));
+      }
     }
 
-    for (int docid : docidSet)
+    for (int docid : docidSet) {
       result.docScores.add(docid, 1.0);
+    }
 
     freeDaaTPtrs();
     result.docScores.sort();
@@ -87,13 +96,14 @@ public class QryopSlOr extends QryopSl {
   }
 
   /**
-   *  Evaluates the query operator for ranked boolean retrieval models,
-   *  including any child operators and returns the result.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @return The result of evaluating the query.
-   *  @throws IOException
+   * Evaluates the query operator for ranked boolean retrieval models,
+   * including any child operators and returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
    */
-  private QryResult evaluateRankedBoolean (RetrievalModel r) throws IOException {
+  private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
     Map<Integer, Double> docIdScoreMap = new HashMap<Integer, Double>();
@@ -105,17 +115,18 @@ public class QryopSlOr extends QryopSl {
         double docScore = p.scoreList.getDocidScore(i);
         if (!docIdScoreMap.containsKey(docId)) {
           docIdScoreMap.put(docId, docScore);
-        }
-        else { // update the map if the score is greater
+        } else { // update the map if the score is greater
           double currScore = docIdScoreMap.get(docId);
-          if (docScore > currScore)
+          if (docScore > currScore) {
             docIdScoreMap.put(docId, docScore);
+          }
         }
       }
     }
 
-    for (Map.Entry<Integer, Double> entry : docIdScoreMap.entrySet())
+    for (Map.Entry<Integer, Double> entry : docIdScoreMap.entrySet()) {
       result.docScores.add(entry.getKey(), entry.getValue());
+    }
 
     result.docScores.sort();
     return result;

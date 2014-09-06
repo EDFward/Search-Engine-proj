@@ -15,8 +15,6 @@
  * limitations under the License.
  */
 
-import java.io.Reader;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
@@ -33,6 +31,8 @@ import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.analysis.util.StopwordAnalyzerBase;
 import org.apache.lucene.util.Version;
 
+import java.io.Reader;
+
 /**
  * {@link Analyzer} for English.
  */
@@ -40,16 +40,21 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
 
   public enum StemmerType {
     NONE, PORTER, KSTEM
-  };
+  }
+
+  ;
 
   private final CharArraySet stemExclusionSet;
+
   private Boolean doLowerCase = true;
+
   private Boolean doStopwordRemoval = true;
+
   private StemmerType stemmer = StemmerType.PORTER;
 
   /**
    * Returns an unmodifiable instance of the default stop words set.
-   * 
+   *
    * @return default stop words set.
    */
   public static CharArraySet getDefaultStopSet() {
@@ -73,11 +78,9 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
 
   /**
    * Builds an analyzer with the given stop words.
-   * 
-   * @param matchVersion
-   *          lucene compatibility version
-   * @param stopwords
-   *          a stopword set
+   *
+   * @param matchVersion lucene compatibility version
+   * @param stopwords    a stopword set
    */
   public EnglishAnalyzerConfigurable(Version matchVersion, CharArraySet stopwords) {
     this(matchVersion, stopwords, CharArraySet.EMPTY_SET);
@@ -87,19 +90,16 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
    * Builds an analyzer with the given stop words. If a non-empty stem exclusion
    * set is provided this analyzer will add a {@link SetKeywordMarkerFilter}
    * before stemming.
-   * 
-   * @param matchVersion
-   *          lucene compatibility version
-   * @param stopwords
-   *          a stopword set
-   * @param stemExclusionSet
-   *          a set of terms not to be stemmed
+   *
+   * @param matchVersion     lucene compatibility version
+   * @param stopwords        a stopword set
+   * @param stemExclusionSet a set of terms not to be stemmed
    */
   public EnglishAnalyzerConfigurable(Version matchVersion, CharArraySet stopwords,
-      CharArraySet stemExclusionSet) {
+          CharArraySet stemExclusionSet) {
     super(matchVersion, stopwords);
     this.stemExclusionSet = CharArraySet.unmodifiableSet(CharArraySet.copy(matchVersion,
-        stemExclusionSet));
+            stemExclusionSet));
   }
 
   /**
@@ -126,13 +126,13 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
   /**
    * Creates a {@link org.apache.lucene.analysis.Analyzer.TokenStreamComponents}
    * which tokenizes all the text in the provided {@link Reader}.
-   * 
+   *
    * @return A {@link org.apache.lucene.analysis.Analyzer.TokenStreamComponents}
-   *         built from an {@link StandardTokenizer} filtered with
-   *         {@link StandardFilter}, {@link EnglishPossessiveFilter},
-   *         {@link LowerCaseFilter}, {@link StopFilter} ,
-   *         {@link SetKeywordMarkerFilter} if a stem exclusion set is provided
-   *         and {@link PorterStemFilter}.
+   * built from an {@link StandardTokenizer} filtered with
+   * {@link StandardFilter}, {@link EnglishPossessiveFilter},
+   * {@link LowerCaseFilter}, {@link StopFilter} ,
+   * {@link SetKeywordMarkerFilter} if a stem exclusion set is provided
+   * and {@link PorterStemFilter}.
    */
   @Override
   protected TokenStreamComponents createComponents(String fieldName, Reader reader) {
@@ -142,19 +142,23 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
 
     result = new EnglishPossessiveFilter(matchVersion, result);
 
-    if (this.doLowerCase)
+    if (this.doLowerCase) {
       result = new LowerCaseFilter(matchVersion, result);
+    }
 
-    if (this.doStopwordRemoval)
+    if (this.doStopwordRemoval) {
       result = new StopFilter(matchVersion, result, stopwords);
+    }
 
-    if (!stemExclusionSet.isEmpty())
+    if (!stemExclusionSet.isEmpty()) {
       result = new SetKeywordMarkerFilter(result, stemExclusionSet);
+    }
 
-    if (this.stemmer == StemmerType.PORTER)
+    if (this.stemmer == StemmerType.PORTER) {
       result = new PorterStemFilter(result);
-    else if (this.stemmer == StemmerType.KSTEM)
+    } else if (this.stemmer == StemmerType.KSTEM) {
       result = new KStemFilter(result);
+    }
 
     return new TokenStreamComponents(source, result);
   }
