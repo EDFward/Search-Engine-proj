@@ -5,7 +5,11 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 public class ScoreList {
 
@@ -49,6 +53,35 @@ public class ScoreList {
    */
   public double getDocidScore(int n) {
     return this.scores.get(n).score;
+  }
+
+  /**
+   * Sort the score list by the entry's score in descending order.
+   * @return void
+   */
+  public void sort() {
+    Collections.sort(scores, new Comparator<ScoreListEntry>() {
+      @Override
+      public int compare(ScoreListEntry entry1,
+              ScoreListEntry entry2) {
+        if (entry1.score < entry2.score)
+          return 1;
+        else if (entry1.score > entry2.score)
+          return -1;
+        else { // external docid as secondary key
+          String externalId1 = null, externalId2 = null;
+          try {
+            externalId1 = QryEval.getExternalDocid(entry1.docid);
+            externalId2 = QryEval.getExternalDocid(entry2.docid);
+          } catch (IOException e) {
+            System.err.println("Error: Failed to get external ID");
+            e.printStackTrace();
+            System.exit(1);
+          }
+          return externalId1.compareTo(externalId2);
+        }
+      }
+    });
   }
 
 }

@@ -55,7 +55,7 @@ public class QryopSlScore extends QryopSl {
 
     if (r instanceof RetrievalModelUnrankedBoolean)
       return (evaluateBoolean(r));
-    else if (r instanceof RetrievalModelUnrankedBoolean)
+    else if (r instanceof RetrievalModelRankedBoolean)
       return evaluateRankedBoolean(r);
 
     return null;

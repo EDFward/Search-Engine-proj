@@ -1,6 +1,8 @@
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 public class QryopSlOr extends QryopSl {
 
@@ -42,6 +44,8 @@ public class QryopSlOr extends QryopSl {
   public QryResult evaluate(RetrievalModel r) throws IOException {
     if (r instanceof RetrievalModelUnrankedBoolean)
       return (evaluateBoolean (r));
+    else if (r instanceof RetrievalModelRankedBoolean)
+      return evaluateRankedBoolean(r);
 
     return null;
   }
@@ -66,7 +70,7 @@ public class QryopSlOr extends QryopSl {
   private QryResult evaluateBoolean (RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
-    Set<Integer> docidSet = new TreeSet<Integer>();
+    Set<Integer> docidSet = new HashSet<Integer>();
 
     for (DaaTPtr p : this.daatPtrs) {
       int docSize = p.scoreList.scores.size();
@@ -78,6 +82,42 @@ public class QryopSlOr extends QryopSl {
       result.docScores.add(docid, 1.0);
 
     freeDaaTPtrs();
+    result.docScores.sort();
+    return result;
+  }
+
+  /**
+   *  Evaluates the query operator for ranked boolean retrieval models,
+   *  including any child operators and returns the result.
+   *  @param r A retrieval model that controls how the operator behaves.
+   *  @return The result of evaluating the query.
+   *  @throws IOException
+   */
+  private QryResult evaluateRankedBoolean (RetrievalModel r) throws IOException {
+    allocDaaTPtrs(r);
+    QryResult result = new QryResult();
+    Map<Integer, Double> docIdScoreMap = new HashMap<Integer, Double>();
+
+    for (DaaTPtr p : this.daatPtrs) {
+      int docSize = p.scoreList.scores.size();
+      for (int i = 0; i < docSize; ++i) {
+        int docId = p.scoreList.getDocid(i);
+        double docScore = p.scoreList.getDocidScore(i);
+        if (!docIdScoreMap.containsKey(docId)) {
+          docIdScoreMap.put(docId, docScore);
+        }
+        else { // update the map if the score is greater
+          double currScore = docIdScoreMap.get(docId);
+          if (docScore > currScore)
+            docIdScoreMap.put(docId, docScore);
+        }
+      }
+    }
+
+    for (Map.Entry<Integer, Double> entry : docIdScoreMap.entrySet())
+      result.docScores.add(entry.getKey(), entry.getValue());
+
+    result.docScores.sort();
     return result;
   }
 }

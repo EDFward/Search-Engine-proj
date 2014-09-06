@@ -70,16 +70,14 @@ public class QryEval {
 
     // parameters required for this example to run
     if (!params.containsKey("indexPath")) {
-      System.err.println("Error: Parameter 'indexPath' was missing.");
-      System.exit(1);
+      fatalError("Error: Parameter 'indexPath' was missing.");
     }
 
     // open the index
     READER = DirectoryReader.open(FSDirectory.open(new File(params.get("indexPath"))));
 
     if (READER == null) {
-      System.err.println(usage);
-      System.exit(1);
+      fatalError(usage);
     }
 
     // open query input file and read queries
@@ -94,9 +92,8 @@ public class QryEval {
         line = queryFileReader.readLine();
       }
     } catch (Exception e) {
-      System.err.println("Error: Read query file failed.");
       e.printStackTrace();
-      System.exit(1);
+      fatalError("Error: Read query file failed.");
     }
     finally {
       queryFileReader.close();
@@ -107,42 +104,49 @@ public class QryEval {
       model = (RetrievalModel) Class.forName(
               "RetrievalModel" + params.get("retrievalAlgorithm")).newInstance();
     } catch (Exception e) {
-      System.err.println("Error: Failed to load specified retrieval model.");
       e.printStackTrace();
-      System.exit(1);
+      fatalError("Error: Failed to load specified retrieval model.");
     }
 
     // process the query list one by one
+    List<QryResult> queryResultList = new ArrayList<QryResult>();
     for (String query : queryList) {
-      printResults(query, parseQuery(query).evaluate(model));
+      QryResult r = parseQuery(query).evaluate(model);
+      queryResultList.add(r);
+      printResults(query, r);
     }
 
-    /*
-     *  Create the trec_eval output.  Your code should write to the
-     *  file specified in the parameter file, and it should write the
-     *  results that you retrieved above.  This code just allows the
-     *  testing infrastructure to work on QryEval.
-     */
+
+    // Create the trec_eval output.
     BufferedWriter writer = null;
-
     try {
-      writer = new BufferedWriter(new FileWriter(new File("teval.in")));
+      writer = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
 
-      writer.write("1 Q0 clueweb09-enwp01-75-20596 1 1.0 run-1");
-      writer.write("1 Q0 clueweb09-enwp01-58-04573 2 0.9 run-1");
-      writer.write("1 Q0 clueweb09-enwp01-24-11888 3 0.8 run-1");
-      writer.write("2 Q0 clueweb09-enwp00-70-20490 1 0.9 run-1");
+      int i = 1;
+      for (QryResult result : queryResultList) {
+        if (result.docScores.scores.size() < 1) {
+          writer.write(i + " Q0 dummy 1 0 run-1\n");
+        } else {
+          for (int j = 0; j < result.docScores.scores.size(); ++j) {
+            String s = String.format("%d Q0 %s %d %.2f run-1\n",
+                    i,                                              // query id
+                    getExternalDocid(result.docScores.getDocid(j)), // external id
+                    j + 1,                                          // rank
+                    result.docScores.getDocidScore(j));
+            writer.write(s);
+          }
+        }
+        ++i;
+      }
     } catch (Exception e) {
       e.printStackTrace();
+      fatalError("Error: Write trec eval results failed.");
     } finally {
       try {
         writer.close();
       } catch (Exception e) {
       }
     }
-
-    // Later HW assignments will use more RAM, so you want to be aware
-    // of how much memory your program uses.
 
     printMemoryUsage(false);
   }
@@ -325,7 +329,6 @@ public class QryEval {
     } else {
       for (int i = 0; i < result.docScores.scores.size(); i++) {
         System.out.println("\t" + i + ":  "
-                + result.docScores.getDocid(i) + ", "
                 + getExternalDocid(result.docScores.getDocid(i)) + ", "
                 + result.docScores.getDocidScore(i));
       }

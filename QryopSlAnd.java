@@ -5,7 +5,8 @@
  */
 
 import java.io.*;
-import java.util.*;
+import java.util.Collections;
+import java.util.ListIterator;
 
 public class QryopSlAnd extends QryopSl {
 
@@ -41,7 +42,7 @@ public class QryopSlAnd extends QryopSl {
 
     if (r instanceof RetrievalModelUnrankedBoolean)
       return evaluateBoolean(r);
-    else if (r instanceof RetrievalModelUnrankedBoolean)
+    else if (r instanceof RetrievalModelRankedBoolean)
       return evaluateRankedBoolean(r);
 
     return null;
@@ -144,9 +145,8 @@ public class QryopSlAnd extends QryopSl {
 
       result.docScores.add(ptr0Docid, docScore);
     }
-
     freeDaaTPtrs();
-
+    result.docScores.sort();
     return result;
   }
 
@@ -159,6 +159,7 @@ public class QryopSlAnd extends QryopSl {
    */
   private QryResult evaluateRankedBoolean (RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
+    QryResult result = new QryResult();
 
     // put daat-ptr with shortest score list in first place. O(n)
     final ListIterator<DaaTPtr> itr = this.daatPtrs.listIterator();
@@ -179,9 +180,30 @@ public class QryopSlAnd extends QryopSl {
     TRAVERSE_DOC_IN_PTR0:
     for (; ptr0.nextDoc < ptr0.scoreList.scores.size(); ptr0.nextDoc++) {
       int ptr0Docid = ptr0.scoreList.getDocid(ptr0.nextDoc);
-//      double currScore = ptr0.scoreList.getDocidScore(ptr0.nextDoc);
+      double currScore = ptr0.scoreList.getDocidScore(ptr0.nextDoc);
 
+      for (int j = 1; j < this.daatPtrs.size(); ++j) {
+        DaaTPtr ptrj = this.daatPtrs.get(j);
+
+        while (true) {
+          if (ptrj.nextDoc >= ptrj.scoreList.scores.size())
+            break TRAVERSE_DOC_IN_PTR0;    // No more docs can match
+          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid)
+            continue TRAVERSE_DOC_IN_PTR0;  // The ptr0docid can't match.
+          else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid)
+            ptrj.nextDoc++;      // Not yet at the right doc.
+          else
+            break;        // ptrj matches ptr0Docid
+        }
+
+        double ptrjScore = ptrj.scoreList.getDocidScore(ptrj.nextDoc);
+        if (ptrjScore < currScore)
+          currScore = ptrjScore;
+      }
+      result.docScores.add(ptr0Docid, currScore);
     }
-    return null;
+    freeDaaTPtrs();
+    result.docScores.sort();
+    return result;
   }
 }
