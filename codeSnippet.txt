@@ -1,0 +1,25 @@
+    //  A one-word query.
+    printResults("pea",
+            (new QryopSlScore(
+                    new QryopIlTerm(tokenizeQuery("pea")[0]))).evaluate(model));
+
+    //  A more complex query.
+    printResults("#AND (aparagus broccoli cauliflower #SYN(peapods peas))",
+            (new QryopSlAnd(
+                    new QryopIlTerm(tokenizeQuery("asparagus")[0]),
+                    new QryopIlTerm(tokenizeQuery("broccoli")[0]),
+                    new QryopIlTerm(tokenizeQuery("cauliflower")[0]),
+                    new QryopIlSyn(
+                            new QryopIlTerm(tokenizeQuery("peapods")[0]),
+                            new QryopIlTerm(tokenizeQuery("peas")[0])))).evaluate(model));
+
+
+    DocLengthStore s = new DocLengthStore(READER);
+    // Lookup the document length of the body field of doc 0.
+    System.out.println(s.getDocLength("body", 0)); 
+
+    // How to use the term vector.
+    TermVector tv = new TermVector(1, "body");
+    System.out.println(tv.stemString(100)); // get the string for the 100th stem
+    System.out.println(tv.stemDf(100)); // get its df
+    System.out.println(tv.totalStemFreq(100)); // get its ctf
