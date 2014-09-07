@@ -4,11 +4,11 @@ import java.util.List;
 
 public class QryopSlNear extends QryopIl {
 
-  public QryopSlNear() {
-    distance = 0;
+  public QryopSlNear(int distance) {
+    this.distance = distance;
   }
 
-  public void QryopSlNear(int distance, Qryop... q) {
+  public QryopSlNear(int distance, Qryop... q) {
     this.distance = distance;
     Collections.addAll(this.args, q);
   }
@@ -33,18 +33,18 @@ public class QryopSlNear extends QryopIl {
     DaaTPtr ptr0 = this.daatPtrs.get(0);
 
     ITERATE_DOCS:
-    for (; ptr0.nextDoc < ptr0.scoreList.scores.size(); ptr0.nextDoc++) {
+    for (; ptr0.nextDoc < ptr0.invList.postings.size(); ptr0.nextDoc++) {
       int ptr0Docid = ptr0.invList.getDocid(ptr0.nextDoc);
 
       for (int j = 1; j < this.daatPtrs.size(); ++j) {
         DaaTPtr ptrj = this.daatPtrs.get(j);
 
         while (true) {
-          if (ptrj.nextDoc >= ptrj.scoreList.scores.size()) {
+          if (ptrj.nextDoc >= ptrj.invList.postings.size()) {
             break ITERATE_DOCS;    // No more docs can match
-          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid) {
+          } else if (ptrj.invList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue ITERATE_DOCS;  // The ptr0docid can't match.
-          } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid) {
+          } else if (ptrj.invList.getDocid(ptrj.nextDoc) < ptr0Docid) {
             ptrj.nextDoc++;      // Not yet at the right doc.
           } else {
             break;        // ptrj matches ptr0Docid
@@ -127,5 +127,5 @@ public class QryopSlNear extends QryopIl {
     return 0.0;
   }
 
-  private int distance;
+  private final int distance;
 }

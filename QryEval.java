@@ -246,6 +246,15 @@ public class QryEval {
       } else if (token.equalsIgnoreCase("#or")) {
         currentOp = new QryopSlOr();
         stack.push(currentOp);
+      } else if (token.toLowerCase().startsWith("#near")) {
+        try {
+          int nearArg = Integer.parseInt(token.split("\\\\")[1]);
+          currentOp = new QryopSlNear(nearArg);
+          stack.push(currentOp);
+        } catch (NumberFormatException e) {
+          e.printStackTrace();
+          fatalError("Error: wrong format for NEAR argument.");
+        }
       } else if (token.startsWith(")")) {
         /*
           Finish current query operator.
