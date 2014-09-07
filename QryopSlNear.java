@@ -53,12 +53,16 @@ public class QryopSlNear extends QryopIl {
       }
 
       double docIdScore = 0;
+      // record current position when iterating the same doc for other daat pointers
+      int[] daatPtrPos = new int[this.daatPtrs.size()];
       ITERATE_POSTING:
       for (int ptr0Pos : ptr0.invList.postings.get(ptr0.nextDoc).positions) {
         int prevPos = ptr0Pos;
         for (int j = 1; j < this.daatPtrs.size(); ++j) {
           DaaTPtr ptrj = this.daatPtrs.get(j);
-          for (int ptrjPos : ptrj.invList.postings.get(ptrj.nextDoc).positions) {
+          int ptrjPosSize = ptrj.invList.postings.get(ptrj.nextDoc).positions.size();
+          for (; daatPtrPos[j] < ptrjPosSize; ++daatPtrPos[j]) {
+            int ptrjPos = ptrj.invList.postings.get(ptrj.nextDoc).positions.get(daatPtrPos[j]);
             if (ptrjPos > ptr0Pos) {
               if (ptrjPos - prevPos <= distance) {
                 prevPos = ptrjPos;               // find good position in this
