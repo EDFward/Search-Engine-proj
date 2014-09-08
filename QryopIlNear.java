@@ -9,11 +9,6 @@ public class QryopIlNear extends QryopIl {
     this.distance = distance;
   }
 
-  public QryopIlNear(int distance, Qryop... q) {
-    this.distance = distance;
-    Collections.addAll(this.args, q);
-  }
-
   /**
    * Appends an argument to the list of query operator arguments.
    *
@@ -25,6 +20,14 @@ public class QryopIlNear extends QryopIl {
     this.args.add(q);
   }
 
+  /**
+   * Evaluates the query operator, including any child operators and
+   * returns the result.
+   *
+   * @param r A retrieval model that controls how the operator behaves.
+   * @return The result of evaluating the query.
+   * @throws IOException
+   */
   @Override
   public QryResult evaluate(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
@@ -45,7 +48,7 @@ public class QryopIlNear extends QryopIl {
           if (ptrj.nextDoc >= ptrj.invList.postings.size()) {
             break ITERATE_DOCS;     // No more docs can match
           } else if (ptrj.invList.getDocid(ptrj.nextDoc) > ptr0Docid) {
-            continue ITERATE_DOCS;  // The ptr0docid can't match.
+            continue ITERATE_DOCS;  // This ptr0docid can't match.
           } else if (ptrj.invList.getDocid(ptrj.nextDoc) < ptr0Docid) {
             ptrj.nextDoc++;         // Not yet at the right doc.
           } else {
@@ -73,19 +76,24 @@ public class QryopIlNear extends QryopIl {
                 continue ITERATE_POSTING;        // since this is impossible
               }
             }
-            // try ptrjPos until greater than ptr0Pos
+            else // try ptrjPos until greater than ptr0Pos
+              continue;
           }
         }
         // all docIds have positions matching the requirement, record the pos
         positions.add(ptr0Pos);
       }
-      if (!positions.isEmpty()) {
+      if (!positions.isEmpty())
         result.invertedList.appendPosting(ptr0Docid, positions);
-      }
     }
+    freeDaaTPtrs();
     return result;
   }
 
+  /**
+   *  Return a string version of this query operator.
+   *  @return The string version of this query operator.
+   */
   @Override
   public String toString() {
     String result = new String();
@@ -95,6 +103,18 @@ public class QryopIlNear extends QryopIl {
     }
 
     return "#NEAR/" + distance + "( " + result + ")";
+  }
+
+  /**
+   *  Calculate the default score for the specified document if it
+   *  does not match the query operator.  This score is 0 for many
+   *  retrieval models, but not all retrieval models.
+   *  @param r A retrieval model that controls how the operator behaves.
+   *  @param docid The internal id of the document that needs a default score.
+   *  @return The default score.
+   */
+  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
+    return 0.0;
   }
 
   /**
@@ -121,17 +141,9 @@ public class QryopIlNear extends QryopIl {
     return true;
   }
 
-  /*
-    *  Calculate the default score for the specified document if it
-    *  does not match the query operator.  This score is 0 for many
-    *  retrieval models, but not all retrieval models.
-    *  @param r A retrieval model that controls how the operator behaves.
-    *  @param docid The internal id of the document that needs a default score.
-    *  @return The default score.
-    */
-  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
-    return 0.0;
-  }
-
+  /**
+   * the only parameter for near operator, indicating the distance
+   * allowed between each word
+   */
   private final int distance;
 }

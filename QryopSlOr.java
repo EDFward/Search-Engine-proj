@@ -55,6 +55,10 @@ public class QryopSlOr extends QryopSl {
     return null;
   }
 
+  /**
+   *  Return a string version of this query operator.
+   *  @return The string version of this query operator.
+   */
   @Override
   public String toString() {
     String result = new String();
@@ -77,6 +81,7 @@ public class QryopSlOr extends QryopSl {
   private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
+    // only a set is necessary
     Set<Integer> docidSet = new HashSet<Integer>();
 
     for (DaaTPtr p : this.daatPtrs) {
@@ -106,6 +111,7 @@ public class QryopSlOr extends QryopSl {
   private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
+    // use hash map to store the scores
     Map<Integer, Double> docIdScoreMap = new HashMap<Integer, Double>();
 
     for (DaaTPtr p : this.daatPtrs) {
@@ -113,6 +119,7 @@ public class QryopSlOr extends QryopSl {
       for (int i = 0; i < docSize; ++i) {
         int docId = p.scoreList.getDocid(i);
         double docScore = p.scoreList.getDocidScore(i);
+
         if (!docIdScoreMap.containsKey(docId)) {
           docIdScoreMap.put(docId, docScore);
         } else { // update the map if the score is greater
@@ -123,11 +130,12 @@ public class QryopSlOr extends QryopSl {
         }
       }
     }
-
+    // put docId - score into the QryResult
     for (Map.Entry<Integer, Double> entry : docIdScoreMap.entrySet()) {
       result.docScores.add(entry.getKey(), entry.getValue());
     }
 
+    freeDaaTPtrs();
     result.docScores.sortAndTruncate();
     return result;
   }

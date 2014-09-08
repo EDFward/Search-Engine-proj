@@ -53,7 +53,7 @@ public class QryopSlAnd extends QryopSl {
     return null;
   }
 
-  /*
+  /**
    *  Calculate the default score for the specified document if it
    *  does not match the query operator.  This score is 0 for many
    *  retrieval models, but not all retrieval models.
@@ -65,7 +65,7 @@ public class QryopSlAnd extends QryopSl {
     return 0.0;
   }
 
-  /*
+  /**
    *  Return a string version of this query operator.  
    *  @return The string version of this query operator.
    */
@@ -134,19 +134,17 @@ public class QryopSlAnd extends QryopSl {
 
         while (true) {
           if (ptrj.nextDoc >= ptrj.scoreList.scores.size()) {
-            break EVALUATEDOCUMENTS;    // No more docs can match
+            break EVALUATEDOCUMENTS;     // No more docs can match
           } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue EVALUATEDOCUMENTS;  // The ptr0docid can't match.
           } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid) {
-            ptrj.nextDoc++;      // Not yet at the right doc.
+            ptrj.nextDoc++;              // Not yet at the right doc.
           } else {
-            break;        // ptrj matches ptr0Docid
+            break;                       // ptrj matches ptr0Docid
           }
         }
       }
-
       //  The ptr0Docid matched all query arguments, so save it.
-
       result.docScores.add(ptr0Docid, docScore);
     }
     freeDaaTPtrs();
@@ -192,13 +190,13 @@ public class QryopSlAnd extends QryopSl {
 
         while (true) {
           if (ptrj.nextDoc >= ptrj.scoreList.scores.size()) {
-            break TRAVERSE_DOC_IN_PTR0;    // No more docs can match
+            break TRAVERSE_DOC_IN_PTR0;     // No more docs can match
           } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue TRAVERSE_DOC_IN_PTR0;  // The ptr0docid can't match.
           } else if (ptrj.scoreList.getDocid(ptrj.nextDoc) < ptr0Docid) {
-            ptrj.nextDoc++;      // Not yet at the right doc.
+            ptrj.nextDoc++;                 // Not yet at the right doc.
           } else {
-            break;        // ptrj matches ptr0Docid
+            break;                          // ptrj matches ptr0Docid
           }
         }
 

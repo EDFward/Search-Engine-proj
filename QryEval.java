@@ -97,13 +97,15 @@ public class QryEval {
     BufferedReader queryFileReader = null;
     try {
       queryFileReader = new BufferedReader(new FileReader(params.get("queryFilePath")));
-      line = queryFileReader.readLine();
 
-      while (line != null) {
-        String[] parts = line.trim().split(":", 2);
+      while ((line = queryFileReader.readLine())!= null) {
+        line = line.trim();
+        if (line.isEmpty())
+          break;
+
+        String[] parts = line.split(":", 2);
         // add queryId: queryString to the map
         queryStrings.put(Integer.parseInt(parts[0]), parts[1]);
-        line = queryFileReader.readLine();
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -118,8 +120,10 @@ public class QryEval {
       writer = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
 
       for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
+        // evaluate the query
         QryResult result = parseQuery(entry.getValue()).evaluate(model);
         int queryId = entry.getKey();
+        // write to evaluation file
         if (result.docScores.scores.size() < 1) {
           writer.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
