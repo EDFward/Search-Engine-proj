@@ -23,3 +23,14 @@
     System.out.println(tv.stemString(100)); // get the string for the 100th stem
     System.out.println(tv.stemDf(100)); // get its df
     System.out.println(tv.totalStemFreq(100)); // get its ctf
+
+10:#and(cheap internet)
+12:djs
+26:#and(lower #near/1(heart rate))
+29:#and(#near/1(ps 2) games)
+33:#near/1(elliptical trainer)
+52:avp
+71:#near/1(living in india)
+102:#near/3(fickle creek farm)
+149:#and(uplift at #near/1(yellowstone national park))
+190:#and(#near/1(brooks brothers) clearance)

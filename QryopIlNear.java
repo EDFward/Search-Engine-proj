@@ -43,13 +43,13 @@ public class QryopIlNear extends QryopIl {
 
         while (true) {
           if (ptrj.nextDoc >= ptrj.invList.postings.size()) {
-            break ITERATE_DOCS;    // No more docs can match
+            break ITERATE_DOCS;     // No more docs can match
           } else if (ptrj.invList.getDocid(ptrj.nextDoc) > ptr0Docid) {
             continue ITERATE_DOCS;  // The ptr0docid can't match.
           } else if (ptrj.invList.getDocid(ptrj.nextDoc) < ptr0Docid) {
-            ptrj.nextDoc++;      // Not yet at the right doc.
+            ptrj.nextDoc++;         // Not yet at the right doc.
           } else {
-            break;        // ptrj matches ptr0Docid
+            break;                  // ptrj matches ptr0Docid
           }
         }
       }
@@ -69,7 +69,7 @@ public class QryopIlNear extends QryopIl {
               if (ptrjPos - prevPos <= distance) {
                 prevPos = ptrjPos;               // find good position in this
                 break;                           // doc, process next daatPtr.
-              } else {                             // otherwise check next ptr0Pos,
+              } else {                           // otherwise check next ptr0Pos,
                 continue ITERATE_POSTING;        // since this is impossible
               }
             }

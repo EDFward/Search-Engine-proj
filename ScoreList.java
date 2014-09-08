@@ -13,7 +13,7 @@ import java.util.List;
 
 public class ScoreList {
 
-  //  A little utilty class to create a <docid, score> object.
+  //  A little utility class to create a <docid, score> object.
 
   protected class ScoreListEntry {
     private int docid;
@@ -61,10 +61,12 @@ public class ScoreList {
 
   /**
    * Sort the score list by the entry's score in descending order.
-   *
+   * Truncate the score list if necessary, then break ties using external
+   * doc ID.
    * @return void
    */
   public void sortAndTruncate() {
+    //
     Collections.sort(scores, new Comparator<ScoreListEntry>() {
       @Override
       public int compare(ScoreListEntry entry1,
@@ -84,6 +86,7 @@ public class ScoreList {
       scores = new ArrayList<ScoreListEntry>(scores.subList(0, 100));
     }
 
+    // then sort again, and break ties using external doc ID
     Collections.sort(scores, new Comparator<ScoreListEntry>() {
       @Override
       public int compare(ScoreListEntry entry1,

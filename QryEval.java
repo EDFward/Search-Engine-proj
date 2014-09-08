@@ -213,7 +213,8 @@ public class QryEval {
 
     qString = qString.trim();
 
-    if (qString.charAt(0) != '#') {
+    if (qString.charAt(0) != '#' ||
+            qString.toLowerCase().startsWith("#near")) {
       qString = "#or(" + qString + ")";
     }
 
