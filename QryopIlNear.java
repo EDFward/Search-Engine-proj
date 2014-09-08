@@ -1,14 +1,15 @@
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class QryopSlNear extends QryopIl {
+public class QryopIlNear extends QryopIl {
 
-  public QryopSlNear(int distance) {
+  public QryopIlNear(int distance) {
     this.distance = distance;
   }
 
-  public QryopSlNear(int distance, Qryop... q) {
+  public QryopIlNear(int distance, Qryop... q) {
     this.distance = distance;
     Collections.addAll(this.args, q);
   }
@@ -30,6 +31,7 @@ public class QryopSlNear extends QryopIl {
     syntaxCheckArgResults(this.daatPtrs);
 
     QryResult result = new QryResult();
+    result.invertedList.field = new String(this.daatPtrs.get(0).invList.field);
     DaaTPtr ptr0 = this.daatPtrs.get(0);
 
     ITERATE_DOCS:
@@ -52,7 +54,7 @@ public class QryopSlNear extends QryopIl {
         }
       }
 
-      double docIdScore = 0;
+      List<Integer> positions = new ArrayList<Integer>();
       // record current position when iterating the same doc for other daat pointers
       int[] daatPtrPos = new int[this.daatPtrs.size()];
       ITERATE_POSTING:
@@ -74,11 +76,11 @@ public class QryopSlNear extends QryopIl {
             // try ptrjPos until greater than ptr0Pos
           }
         }
-        // all docIds have positions matching the requirement, increment score
-        docIdScore++;
+        // all docIds have positions matching the requirement, record the pos
+        positions.add(ptr0Pos);
       }
-      if (docIdScore > 0) {
-        result.docScores.add(ptr0Docid, docIdScore);
+      if (!positions.isEmpty()) {
+        result.invertedList.appendPosting(ptr0Docid, positions);
       }
     }
     return result;
@@ -92,7 +94,7 @@ public class QryopSlNear extends QryopIl {
       result += arg.toString() + " ";
     }
 
-    return "#NEAR\\" + distance + "( " + result + ")";
+    return "#NEAR/" + distance + "( " + result + ")";
   }
 
   /**

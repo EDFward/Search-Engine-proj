@@ -61,7 +61,7 @@ public class QryopIlSyn extends QryopSl {
     //  is removed from daatPtrs, so this loop runs until daatPtrs is empty.
 
     //  This implementation is intended to be clear.  A more efficient
-    //  implementation would combine loops and use merge-sort.
+    //  implementation would combine loops and use merge-sort
 
     while (this.daatPtrs.size() > 0) {
 

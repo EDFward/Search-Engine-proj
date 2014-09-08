@@ -122,7 +122,7 @@ public class InvList {
    * Append a posting to the posting list.  Posting must be appended
    * in docid order, otherwise this method fails.
    *
-   * @param n         The posting internal document id.
+   * @param docid     The posting internal document id.
    * @param positions A list of positions where the term occurs.
    * @result true if the posting was added successfully, otherwise false.
    */

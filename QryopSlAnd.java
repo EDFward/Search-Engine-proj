@@ -150,7 +150,7 @@ public class QryopSlAnd extends QryopSl {
       result.docScores.add(ptr0Docid, docScore);
     }
     freeDaaTPtrs();
-    result.docScores.sort();
+    result.docScores.sortAndTruncate();
     return result;
   }
 
@@ -210,7 +210,7 @@ public class QryopSlAnd extends QryopSl {
       result.docScores.add(ptr0Docid, currScore);
     }
     freeDaaTPtrs();
-    result.docScores.sort();
+    result.docScores.sortAndTruncate();
     return result;
   }
 }

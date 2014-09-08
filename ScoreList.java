@@ -64,7 +64,7 @@ public class ScoreList {
    *
    * @return void
    */
-  public void sort() {
+  public void sortAndTruncate() {
     Collections.sort(scores, new Comparator<ScoreListEntry>() {
       @Override
       public int compare(ScoreListEntry entry1,
@@ -73,7 +73,26 @@ public class ScoreList {
           return 1;
         } else if (entry1.score > entry2.score) {
           return -1;
-        } else { // external docid as secondary key
+        } else {
+          return 0;
+        }
+      }
+    });
+
+    // truncate if score list is more than 100 after primary sorting
+    if (scores.size() > 100) {
+      scores = new ArrayList<ScoreListEntry>(scores.subList(0, 100));
+    }
+
+    Collections.sort(scores, new Comparator<ScoreListEntry>() {
+      @Override
+      public int compare(ScoreListEntry entry1,
+              ScoreListEntry entry2) {
+        if (entry1.score < entry2.score) {
+          return 1;
+        } else if (entry1.score > entry2.score) {
+          return -1;
+        } else {
           String externalId1 = null, externalId2 = null;
           try {
             externalId1 = QryEval.getExternalDocid(entry1.docid);

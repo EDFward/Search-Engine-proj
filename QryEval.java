@@ -82,24 +82,7 @@ public class QryEval {
       fatalError(usage);
     }
 
-    // open query input file and read queries
-    List<String> queryList = new ArrayList<String>();
-    BufferedReader queryFileReader = null;
-    try {
-      queryFileReader = new BufferedReader(new FileReader(params.get("queryFilePath")));
-      line = queryFileReader.readLine();
-
-      while (line != null) {
-        queryList.add(line.trim());
-        line = queryFileReader.readLine();
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      fatalError("Error: Read query file failed.");
-    } finally {
-      queryFileReader.close();
-    }
-
+    // define the retrieval model from parameter file
     RetrievalModel model = null;
     try {
       model = (RetrievalModel) Class.forName(
@@ -109,12 +92,24 @@ public class QryEval {
       fatalError("Error: Failed to load specified retrieval model.");
     }
 
-    // process the query list one by one
-    List<QryResult> queryResultList = new ArrayList<QryResult>();
-    for (String query : queryList) {
-      QryResult r = parseQuery(query).evaluate(model);
-      queryResultList.add(r);
-      printResults(query, r);
+    // open query input file and read queries
+    Map<Integer, String> queryStrings = new LinkedHashMap<Integer, String>();
+    BufferedReader queryFileReader = null;
+    try {
+      queryFileReader = new BufferedReader(new FileReader(params.get("queryFilePath")));
+      line = queryFileReader.readLine();
+
+      while (line != null) {
+        String[] parts = line.trim().split(":", 2);
+        // add queryId: queryString to the map
+        queryStrings.put(Integer.parseInt(parts[0]), parts[1]);
+        line = queryFileReader.readLine();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      fatalError("Error: Read/Evaluate query file failed.");
+    } finally {
+      queryFileReader.close();
     }
 
     // Create the trec_eval output.
@@ -122,25 +117,25 @@ public class QryEval {
     try {
       writer = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
 
-      int i = 1;
-      for (QryResult result : queryResultList) {
+      for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
+        QryResult result = parseQuery(entry.getValue()).evaluate(model);
+        int queryId = entry.getKey();
         if (result.docScores.scores.size() < 1) {
-          writer.write(i + " Q0 dummy 1 0 run-1\n");
+          writer.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
           for (int j = 0; j < result.docScores.scores.size(); ++j) {
             String s = String.format("%d Q0 %s %d %.2f run-1\n",
-                    i,                                              // query id
+                    queryId,                                              // query id
                     getExternalDocid(result.docScores.getDocid(j)), // external id
                     j + 1,                                          // rank
                     result.docScores.getDocidScore(j));
             writer.write(s);
           }
         }
-        ++i;
       }
     } catch (Exception e) {
       e.printStackTrace();
-      fatalError("Error: Write trec eval results failed.");
+      fatalError("Error: Write trec-eval results failed.");
     } finally {
       try {
         writer.close();
@@ -248,8 +243,8 @@ public class QryEval {
         stack.push(currentOp);
       } else if (token.toLowerCase().startsWith("#near")) {
         try {
-          int nearArg = Integer.parseInt(token.split("\\\\")[1]);
-          currentOp = new QryopSlNear(nearArg);
+          int nearArg = Integer.parseInt(token.split("/")[1]);
+          currentOp = new QryopIlNear(nearArg);
           stack.push(currentOp);
         } catch (NumberFormatException e) {
           e.printStackTrace();
