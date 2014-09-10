@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Vector;
 
 public class QryopIlNear extends QryopIl {
 
@@ -60,31 +61,41 @@ public class QryopIlNear extends QryopIl {
       List<Integer> positions = new ArrayList<Integer>();
       // record current position when iterating the same doc for other daat pointers
       int[] daatPtrPos = new int[this.daatPtrs.size()];
+      int prevPos;
       ITERATE_POSTING:
       for (int ptr0Pos : ptr0.invList.postings.get(ptr0.nextDoc).positions) {
-        int prevPos = ptr0Pos;
+        prevPos = ptr0Pos;
+
+        ITERATE_DAAT_PTR:
         for (int j = 1; j < this.daatPtrs.size(); ++j) {
           DaaTPtr ptrj = this.daatPtrs.get(j);
-          int ptrjPosSize = ptrj.invList.postings.get(ptrj.nextDoc).positions.size();
-          for (; daatPtrPos[j] < ptrjPosSize; ++daatPtrPos[j]) {
-            int ptrjPos = ptrj.invList.postings.get(ptrj.nextDoc).positions.get(daatPtrPos[j]);
-            if (ptrjPos > ptr0Pos) {
+          Vector<Integer> ptrjPostings = ptrj.invList.postings.get(ptrj.nextDoc).positions;
+          int ptrjPostingSize = ptrjPostings.size();
+
+          for (; daatPtrPos[j] < ptrjPostingSize; ++daatPtrPos[j]) {
+            int ptrjPos = ptrjPostings.get(daatPtrPos[j]);
+            if (ptrjPos > prevPos) {
               if (ptrjPos - prevPos <= distance) {
                 prevPos = ptrjPos;               // find good position in this
-                break;                           // doc, process next daatPtr.
+                continue ITERATE_DAAT_PTR;       // doc, process next daatPtr.
               } else {                           // otherwise check next ptr0Pos,
-                continue ITERATE_POSTING;        // since this is impossible
+                continue ITERATE_POSTING;        // since this one is impossible
               }
             }
             else // try ptrjPos until greater than ptr0Pos
               continue;
           }
+          // if all positions of ptrj are smaller than ptr0Pos,
+          // this doc cannot satisfy NEAR's requirements,
+          // therefore stop iterating posting and record current result
+          break ITERATE_POSTING;
         }
         // all docIds have positions matching the requirement, record the pos
         positions.add(ptr0Pos);
       }
-      if (!positions.isEmpty())
+      if (!positions.isEmpty()) {
         result.invertedList.appendPosting(ptr0Docid, positions);
+      }
     }
     freeDaaTPtrs();
     return result;
