@@ -3,3 +3,5 @@ out/
 index/
 *.iml
 Sample.*
+*.class
+*.swp

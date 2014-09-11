@@ -6,10 +6,7 @@
  */
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 public class ScoreList {
 
@@ -17,18 +14,10 @@ public class ScoreList {
 
   protected class ScoreListEntry {
     private int docid;
-    private String externalDocId;
 
     private double score;
 
     private ScoreListEntry(int docid, double score) {
-      try {
-        this.externalDocId = QryEval.getExternalDocid(docid);
-      } catch (IOException e) {
-        System.err.println("Error: Failed to get external ID");
-        e.printStackTrace();
-        System.exit(1);
-      }
       this.docid = docid;
       this.score = score;
     }
@@ -71,10 +60,60 @@ public class ScoreList {
    * Sort the score list by the entry's score in descending order.
    * Truncate the score list if necessary, then break ties using external
    * doc ID.
+   *
    * @return void
    */
-  public void sortAndTruncate() {
-    // sort by scores, and break ties using external id
+  public void sortAndTruncate() throws IOException {
+    /*
+     * A hashmap is necessary to avoid duplicate computations of
+     * external id, which is very costly. Such hashmap ensures
+     * getExternalDocid only gets called once for all docs
+     */
+    int scoreListSize = scores.size();
+    final Map<ScoreListEntry, String> externalIds = new HashMap<ScoreListEntry, String>(
+            scoreListSize);
+    for (int i = 0; i < scoreListSize; ++i) {
+      ScoreListEntry entry = scores.get(i);
+      externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
+    }
+
+    if (scoreListSize > 100) {
+      // keep a min heap to maintain highest score entries
+      ScoreListEntry[] heap = new ScoreListEntry[100];
+      for (int i = 0; i < 100; ++i) {
+        heap[i] = scores.get(i);
+      }
+
+      // heapify
+      for (int i = heap.length / 2 - 1; i >= 0; --i) {
+        sink(heap, i, externalIds);
+      }
+
+      for (int i = 100; i < scoreListSize; ++i) {
+        ScoreListEntry next = scores.get(i);
+        if (next.score < heap[0].score) // no need to consider next
+        {
+          continue;
+        } else { // now have to compare next with heap[0]
+          String nextExternalId = QryEval.getExternalDocid(next.docid);
+          // decide whether to evict heap[0] or not
+          if (next.score == heap[0].score &&
+                  nextExternalId.compareTo(externalIds.get(heap[0])) > 0) {
+            continue;   // neglect
+          }
+
+          // evict and update externalId map
+          externalIds.remove(heap[0]);
+          heap[0] = next;
+          externalIds.put(next, nextExternalId);
+
+          sink(heap, 0, externalIds);
+        }
+      }
+      scores.clear();
+      scores.addAll(Arrays.asList(heap));
+    }
+
     Collections.sort(scores, new Comparator<ScoreListEntry>() {
       @Override
       public int compare(ScoreListEntry entry1,
@@ -84,13 +123,44 @@ public class ScoreList {
         } else if (entry1.score > entry2.score) {
           return -1;
         } else {
-          return entry1.externalDocId.compareTo(entry2.externalDocId);
+          return externalIds.get(entry1).compareTo(externalIds.get(entry2));
         }
       }
     });
-    // truncate if size too big
-    if (scores.size() > 100) {
-      scores = new ArrayList<ScoreListEntry>(scores.subList(0, 100));
+  }
+
+  private static void sink(ScoreListEntry[] h, int pos, Map<ScoreListEntry, String> externalIds) {
+    // check boundary
+    if (pos > h.length / 2 - 1) {
+      return;
+    }
+
+    int leftPos = pos * 2 + 1,
+            rightPos = pos * 2 + 2;
+
+    int minChildPos = leftPos;
+    if (rightPos < h.length) {
+      if (h[rightPos].score < h[leftPos].score) {
+        minChildPos = rightPos;
+      } else if (h[rightPos].score == h[leftPos].score) {
+        String leftExtId = externalIds.get(h[leftPos]),
+                rightExtId = externalIds.get(h[rightPos]);
+        if (rightExtId.compareTo(leftExtId) > 0) {
+          minChildPos = rightPos;
+        }
+      }
+    }
+
+    if (h[pos].score < h[minChildPos].score ||
+            (h[minChildPos].score == h[pos].score &&
+                    externalIds.get(h[pos]).compareTo(externalIds.get(h[minChildPos])) > 0)) {
+      return; // no need to sink down
+    } else {
+      // first swap, then continue sinking
+      ScoreListEntry tmp = h[pos];
+      h[pos] = h[minChildPos];
+      h[minChildPos] = tmp;
+      sink(h, minChildPos, externalIds);
     }
   }
 }
