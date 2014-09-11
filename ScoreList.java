@@ -57,9 +57,8 @@ public class ScoreList {
   }
 
   /**
-   * Sort the score list by the entry's score in descending order.
-   * Truncate the score list if necessary, then break ties using external
-   * doc ID.
+   * Sort the score list (using a heap) by the entry's score in descending order and
+   * break ties using external doc ID.
    *
    * @return void
    */
@@ -89,6 +88,7 @@ public class ScoreList {
         sink(heap, i, externalIds);
       }
 
+      // compare each incoming element
       for (int i = 100; i < scoreListSize; ++i) {
         ScoreListEntry next = scores.get(i);
         if (next.score < heap[0].score) // no need to consider
@@ -107,13 +107,18 @@ public class ScoreList {
           heap[0] = next;
           externalIds.put(next, nextExternalId);
 
+          // keep the heap structured
           sink(heap, 0, externalIds);
         }
       }
+
+      // update the scores to keep only 100 entries
       scores.clear();
       scores.addAll(Arrays.asList(heap));
     }
 
+    // now `scores` has elements <= 100, ok to sort (and the external ids
+    // are recorded in the map, thus no need to read them again)
     Collections.sort(scores, new Comparator<ScoreListEntry>() {
       @Override
       public int compare(ScoreListEntry entry1,
@@ -129,38 +134,43 @@ public class ScoreList {
     });
   }
 
+  /**
+   * Sift-down operation for heap structure.
+   *
+   * @param h Heap as a fixed length array
+   * @param pos Position in the heap to be sifted down
+   * @param externalIds Doc-ExternalId map for comparision
+   */
   private static void sink(ScoreListEntry[] h, int pos, Map<ScoreListEntry, String> externalIds) {
-    // check boundary
-    if (pos > h.length / 2 - 1) {
-      return;
-    }
+    int subRoot = pos;
+    while (subRoot * 2 + 1 < h.length) { // until the subroot is a leaf
+      int minChild = subRoot * 2 + 1;    // first get left child
 
-    int leftPos = pos * 2 + 1,
-            rightPos = pos * 2 + 2;
-
-    int minChildPos = leftPos;
-    if (rightPos < h.length) {
-      if (h[rightPos].score < h[leftPos].score) {
-        minChildPos = rightPos;
-      } else if (h[rightPos].score == h[leftPos].score) {
-        String leftExtId = externalIds.get(h[leftPos]),
-                rightExtId = externalIds.get(h[rightPos]);
-        if (rightExtId.compareTo(leftExtId) > 0) {
-          minChildPos = rightPos;
+      // if right child if smaller than left (score/external Id),
+      // let minChild point to it
+      if (minChild + 1 < h.length) {
+        if (h[minChild + 1].score < h[minChild].score) {
+          minChild++;
+        } else if (h[minChild].score == h[minChild + 1].score) {
+          String leftExtId = externalIds.get(h[minChild]),
+                  rightExtId = externalIds.get(h[minChild + 1]);
+          if (rightExtId.compareTo(leftExtId) > 0) {
+            minChild++;
+          }
         }
       }
-    }
-
-    if (h[pos].score < h[minChildPos].score ||
-            (h[minChildPos].score == h[pos].score &&
-                    externalIds.get(h[pos]).compareTo(externalIds.get(h[minChildPos])) > 0)) {
-      return; // no need to sink down
-    } else {
-      // swap, then continue sinking
-      ScoreListEntry tmp = h[pos];
-      h[pos] = h[minChildPos];
-      h[minChildPos] = tmp;
-      sink(h, minChildPos, externalIds);
+      // now compare the root and minChild
+      if (h[subRoot].score < h[minChild].score ||
+              (h[minChild].score == h[subRoot].score &&
+                      externalIds.get(h[subRoot]).compareTo(externalIds.get(h[minChild])) > 0)) {
+        return; // no need to sink down
+      } else {
+        // swap, then continue sinking
+        ScoreListEntry tmp = h[subRoot];
+        h[subRoot] = h[minChild];
+        h[minChild] = tmp;
+        subRoot = minChild;
+      }
     }
   }
 }
