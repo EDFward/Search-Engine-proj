@@ -96,7 +96,6 @@ public class QryopSlOr extends QryopSl {
     }
 
     freeDaaTPtrs();
-    result.docScores.sortAndTruncate();
     return result;
   }
 
@@ -136,7 +135,6 @@ public class QryopSlOr extends QryopSl {
     }
 
     freeDaaTPtrs();
-    result.docScores.sortAndTruncate();
     return result;
   }
 }

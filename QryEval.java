@@ -122,6 +122,8 @@ public class QryEval {
       for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
         // evaluate the query
         QryResult result = parseQuery(entry.getValue()).evaluate(model);
+        // sort and truncate to 100 if necessary
+        result.docScores.sortAndTruncate();
         int queryId = entry.getKey();
         // write to evaluation file
         if (result.docScores.scores.size() < 1) {

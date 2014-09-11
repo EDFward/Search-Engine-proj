@@ -67,7 +67,7 @@ public class ScoreList {
     /*
      * A hashmap is necessary to avoid duplicate computations of
      * external id, which is very costly. Such hashmap ensures
-     * getExternalDocid only gets called once for all docs
+     * getExternalDocid only gets called once for every docs
      */
     int scoreListSize = scores.size();
     final Map<ScoreListEntry, String> externalIds = new HashMap<ScoreListEntry, String>(
