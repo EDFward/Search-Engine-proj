@@ -1,8 +1,5 @@
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class QryopSlOr extends QryopSl {
 
@@ -81,20 +78,40 @@ public class QryopSlOr extends QryopSl {
   private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
-    // only a set is necessary
-    Set<Integer> docidSet = new HashSet<Integer>();
 
-    for (DaaTPtr p : this.daatPtrs) {
-      int docSize = p.scoreList.scores.size();
-      for (int i = 0; i < docSize; ++i) {
-        docidSet.add(p.scoreList.getDocid(i));
+    // iterate all daat ptrs and find the smallest docid,
+    // and record scores accordingly
+    while (this.daatPtrs.size() > 0)
+    {
+      // record daat ptrs with min docid; advance their nextdoc later
+      List<DaaTPtr> minDaatPtr = new ArrayList<DaaTPtr>();
+      int minDocId = Integer.MAX_VALUE;
+
+      Iterator<DaaTPtr> iter = this.daatPtrs.iterator();
+      while (iter.hasNext()) {
+        DaaTPtr dp = iter.next();
+        // remove this daat ptr if all docs have been traversed
+        if (dp.nextDoc >= dp.scoreList.scores.size()) {
+          iter.remove();
+          continue;
+        }
+
+        // compare doc id and do records
+        int currDocId = dp.scoreList.getDocid(dp.nextDoc);
+        if (currDocId < minDocId) {
+          minDocId = currDocId;
+          minDaatPtr.clear();
+          minDaatPtr.add(dp);
+        } else if (currDocId == minDocId)
+          minDaatPtr.add(dp);
       }
+      // ignore if no more daatPtr
+      if (minDocId != Integer.MAX_VALUE)
+        result.docScores.add(minDocId, 1.0);
+      // advance minDaatPtr's nextdoc since their doc have been processed
+      for (DaaTPtr dp : minDaatPtr)
+        dp.nextDoc++;
     }
-
-    for (int docid : docidSet) {
-      result.docScores.add(docid, 1.0);
-    }
-
     freeDaaTPtrs();
     return result;
   }
@@ -110,30 +127,46 @@ public class QryopSlOr extends QryopSl {
   private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
-    // use hash map to store the scores
-    Map<Integer, Double> docIdScoreMap = new HashMap<Integer, Double>();
 
-    for (DaaTPtr p : this.daatPtrs) {
-      int docSize = p.scoreList.scores.size();
-      for (int i = 0; i < docSize; ++i) {
-        int docId = p.scoreList.getDocid(i);
-        double docScore = p.scoreList.getDocidScore(i);
+    // iterate all daat ptrs and find the smallest docid,
+    // and record scores accordingly
+    while (this.daatPtrs.size() > 0)
+    {
+      // record daat ptrs with min docid; advance their nextdoc later
+      List<DaaTPtr> minDaatPtr = new ArrayList<DaaTPtr>();
+      int minDocId = Integer.MAX_VALUE;
+      double maxScore = 0;
 
-        if (!docIdScoreMap.containsKey(docId)) {
-          docIdScoreMap.put(docId, docScore);
-        } else { // update the map if the score is greater
-          double currScore = docIdScoreMap.get(docId);
-          if (docScore > currScore) {
-            docIdScoreMap.put(docId, docScore);
-          }
+      Iterator<DaaTPtr> iter = this.daatPtrs.iterator();
+      while (iter.hasNext()) {
+        DaaTPtr dp = iter.next();
+        // remove this daat ptr if all docs have been traversed
+        if (dp.nextDoc >= dp.scoreList.scores.size()) {
+          iter.remove();
+          continue;
+        }
+
+        // compare doc id and do records
+        int currDocId = dp.scoreList.getDocid(dp.nextDoc);
+        if (currDocId < minDocId) {
+          minDocId = currDocId;
+          minDaatPtr.clear();
+          minDaatPtr.add(dp);
+          maxScore = dp.scoreList.getDocidScore(dp.nextDoc);
+        } else if (currDocId == minDocId) {
+          minDaatPtr.add(dp);
+          double currScore = dp.scoreList.getDocidScore(dp.nextDoc);
+          if (currScore > maxScore)
+            maxScore = currScore;
         }
       }
+      // ignore if no more daatPtr
+      if (minDocId != Integer.MAX_VALUE)
+        result.docScores.add(minDocId, maxScore);
+      // advance minDaatPtr's nextdoc since their doc have been processed
+      for (DaaTPtr dp : minDaatPtr)
+        dp.nextDoc++;
     }
-    // put docId - score into the QryResult
-    for (Map.Entry<Integer, Double> entry : docIdScoreMap.entrySet()) {
-      result.docScores.add(entry.getKey(), entry.getValue());
-    }
-
     freeDaaTPtrs();
     return result;
   }

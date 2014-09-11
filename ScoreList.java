@@ -91,7 +91,7 @@ public class ScoreList {
 
       for (int i = 100; i < scoreListSize; ++i) {
         ScoreListEntry next = scores.get(i);
-        if (next.score < heap[0].score) // no need to consider next
+        if (next.score < heap[0].score) // no need to consider
         {
           continue;
         } else { // now have to compare next with heap[0]
@@ -156,7 +156,7 @@ public class ScoreList {
                     externalIds.get(h[pos]).compareTo(externalIds.get(h[minChildPos])) > 0)) {
       return; // no need to sink down
     } else {
-      // first swap, then continue sinking
+      // swap, then continue sinking
       ScoreListEntry tmp = h[pos];
       h[pos] = h[minChildPos];
       h[minChildPos] = tmp;

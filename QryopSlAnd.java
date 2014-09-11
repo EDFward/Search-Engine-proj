@@ -95,28 +95,18 @@ public class QryopSlAnd extends QryopSl {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
 
-    //  Sort the arguments so that the shortest lists are first.  This
-    //  improves the efficiency of exact-match AND without changing
-    //  the result.
-
-    for (int i = 0; i < (this.daatPtrs.size() - 1); i++) {
-      for (int j = i + 1; j < this.daatPtrs.size(); j++) {
-        if (this.daatPtrs.get(i).scoreList.scores.size() >
-                this.daatPtrs.get(j).scoreList.scores.size()) {
-          ScoreList tmpScoreList = this.daatPtrs.get(i).scoreList;
-          this.daatPtrs.get(i).scoreList = this.daatPtrs.get(j).scoreList;
-          this.daatPtrs.get(j).scoreList = tmpScoreList;
-        }
+    // put daat-ptr with shortest score list in first place. O(n)
+    final ListIterator<DaaTPtr> itr = this.daatPtrs.listIterator();
+    DaaTPtr min = itr.next();
+    int minIndex = 0;
+    while (itr.hasNext()) {
+      final DaaTPtr curr = itr.next();
+      if (curr.scoreList.scores.size() < min.scoreList.scores.size()) {
+        min = curr;
+        minIndex = itr.previousIndex();
       }
     }
-
-    //  Exact-match AND requires that ALL scoreLists contain a
-    //  document id.  Use the first (shortest) list to control the
-    //  search for matches.
-
-    //  Named loops are a little ugly.  However, they make it easy
-    //  to terminate an outer loop from within an inner loop.
-    //  Otherwise it is necessary to use flags, which is also ugly.
+    Collections.swap(this.daatPtrs, 0, minIndex);
 
     DaaTPtr ptr0 = this.daatPtrs.get(0);
 
