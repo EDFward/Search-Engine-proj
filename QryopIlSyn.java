@@ -102,27 +102,8 @@ public class QryopIlSyn extends QryopSl {
     return result;
   }
 
-  /**
-   * Return the smallest unexamined docid from the DaaTPtrs.
-   *
-   * @return The smallest internal document id.
-   */
-  public int getSmallestCurrentDocid() {
-
-    int nextDocid = Integer.MAX_VALUE;
-
-    for (int i = 0; i < this.daatPtrs.size(); i++) {
-      DaaTPtr ptri = this.daatPtrs.get(i);
-      if (nextDocid > ptri.invList.getDocid(ptri.nextDoc)) {
-        nextDocid = ptri.invList.getDocid(ptri.nextDoc);
-      }
-    }
-
-    return (nextDocid);
-  }
-
   /*
-   *  Return a string version of this query operator.  
+   *  Return a string version of this query operator.
    *  @return The string version of this query operator.
    */
   public String toString() {
@@ -139,6 +120,25 @@ public class QryopIlSyn extends QryopSl {
   @Override
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
     return 0;
+  }
+
+  /**
+   * Return the smallest unexamined docid from the DaaTPtrs.
+   *
+   * @return The smallest internal document id.
+   */
+  private int getSmallestCurrentDocid() {
+
+    int nextDocid = Integer.MAX_VALUE;
+
+    for (int i = 0; i < this.daatPtrs.size(); i++) {
+      DaaTPtr ptri = this.daatPtrs.get(i);
+      if (nextDocid > ptri.invList.getDocid(ptri.nextDoc)) {
+        nextDocid = ptri.invList.getDocid(ptri.nextDoc);
+      }
+    }
+
+    return (nextDocid);
   }
 
   /**

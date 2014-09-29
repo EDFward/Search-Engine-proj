@@ -5,8 +5,7 @@
  */
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.ListIterator;
+import java.util.*;
 
 public class QryopSlAnd extends QryopSl {
 
@@ -26,7 +25,7 @@ public class QryopSlAnd extends QryopSl {
    * Appends an argument to the list of query operator arguments.  This
    * simplifies the design of some query parsing architectures.
    *
-   * @param {q} q The query argument (query operator) to append.
+   * @param a q The query argument (query operator) to append.
    * @return void
    * @throws IOException
    */
@@ -48,6 +47,8 @@ public class QryopSlAnd extends QryopSl {
       return evaluateBoolean(r);
     } else if (r instanceof RetrievalModelRankedBoolean) {
       return evaluateRankedBoolean(r);
+    } else if (r instanceof RetrievalModelIndri) {
+      return evaluateIndri(r);
     }
 
     return null;
@@ -62,32 +63,35 @@ public class QryopSlAnd extends QryopSl {
    *  @return The default score.
    */
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
+    if (r instanceof RetrievalModelIndri) {
+      double defaultScore = 0;
+      for (Qryop arg : args) {
+        // they must be QryopSl, so downcast.
+        // since they are in log scale, sum them up
+        defaultScore += ((QryopSl)arg).getDefaultScore(r, docid);
+      }
+      // normalization from query terms
+      return defaultScore / args.size();
+    }
+
     return 0.0;
   }
 
   /**
-   *  Return a string version of this query operator.  
+   *  Return a string version of this query operator.
    *  @return The string version of this query operator.
    */
   public String toString() {
 
     String result = new String();
 
-    for (int i = 0; i < this.args.size(); i++) {
-      result += this.args.get(i).toString() + " ";
+    for (Qryop arg : this.args) {
+      result += arg.toString() + " ";
     }
 
     return ("#AND( " + result + ")");
   }
 
-  /**
-   * Evaluates the query operator for boolean retrieval models,
-   * including any child operators and returns the result.
-   *
-   * @param r A retrieval model that controls how the operator behaves.
-   * @return The result of evaluating the query.
-   * @throws IOException
-   */
   private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
 
     //  Initialization
@@ -141,14 +145,6 @@ public class QryopSlAnd extends QryopSl {
     return result;
   }
 
-  /**
-   * Evaluates the query operator for ranked boolean retrieval models,
-   * including any child operators and returns the result.
-   *
-   * @param r A retrieval model that controls how the operator behaves.
-   * @return The result of evaluating the query.
-   * @throws IOException
-   */
   private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
@@ -198,5 +194,61 @@ public class QryopSlAnd extends QryopSl {
     }
     freeDaaTPtrs();
     return result;
+  }
+
+  private QryResult evaluateIndri(RetrievalModel r) throws IOException {
+    allocDaaTPtrs(r);
+    QryResult result = new QryResult();
+
+    int minDocId;
+    // iterate all daat ptrs and find the smallest docid,
+    // and record scores accordingly
+    do
+    {
+      minDocId = getSmallestCurrentDocid();
+      double termScore = 0;
+
+      for (int i = 0; i < daatPtrs.size(); ++i) {
+        DaaTPtr dp = daatPtrs.get(i);
+
+        // compare doc id and do records
+        int currDocId = dp.scoreList.getDocid(dp.nextDoc);
+        if (currDocId != minDocId) {
+          termScore = ((QryopSl)args.get(i)).getDefaultScore(r, minDocId);
+        } else {
+          termScore += dp.scoreList.getDocidScore(dp.nextDoc++);
+        }
+      }
+      // normalize termScore with query term number
+      result.docScores.add(minDocId, termScore / daatPtrs.size());
+    } while (minDocId != Integer.MAX_VALUE);
+    freeDaaTPtrs();
+
+    return result;
+  }
+
+  /**
+   * Return the smallest unexamined docid from the DaaTPtrs or
+   * Integer.MAX_VALUE
+   *
+   * @return The smallest internal document id. Return MAX_VALUE
+   * if all DaaT pointers have been traversed.
+   */
+  private int getSmallestCurrentDocid() {
+
+    int nextDocid = Integer.MAX_VALUE;
+
+    for (DaaTPtr ptri : this.daatPtrs) {
+      // already gone through
+      if (ptri.nextDoc >= ptri.scoreList.scores.size())
+        continue;
+
+      int docid = ptri.invList.getDocid(ptri.nextDoc);
+      if (nextDocid > docid) {
+        nextDocid = docid;
+      }
+    }
+
+    return nextDocid;
   }
 }

@@ -8,6 +8,7 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
+import javax.swing.event.DocumentListener;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -44,6 +45,31 @@ public class QryopSlScore extends QryopSl {
     this.args.add(a);
   }
 
+  /*
+   *  Calculate the default score for a document that does not match
+   *  the query argument.  This score is 0 for many retrieval models,
+   *  but not all retrieval models.
+   *  @param r A retrieval model that controls how the operator behaves.
+   *  @param docid The internal id of the document that needs a default score.
+   *  @return The default score.
+   */
+  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
+
+    if (r instanceof RetrievalModelIndri) {
+      if (ctfParam1 == -1 || ctfParam2 == -1) {
+        System.err.println("Error: default score parameters not set up.");
+        return 0;
+      }
+      int mu = ((RetrievalModelIndri) r).getMu();
+      double lambda = ((RetrievalModelIndri) r).getLambda();
+      DocLengthStore docLengthScore = new DocLengthStore(QryEval.READER);
+      long doclen = docLengthScore.getDocLength(field, (int) docid);
+      return Math.log(lambda * ( mu * ctfParam1) / (doclen + mu) + ctfParam2);
+    }
+
+    return 0.0;
+  }
+
   /**
    * Evaluate the query operator.
    *
@@ -57,18 +83,31 @@ public class QryopSlScore extends QryopSl {
       return (evaluateBoolean(r));
     } else if (r instanceof RetrievalModelRankedBoolean) {
       return evaluateRankedBoolean(r);
+    } else if (r instanceof RetrievalModelBM25) {
+      return evaluateBM25(r);
+    } else if (r instanceof RetrievalModelIndri) {
+      return evaluateIndri(r);
     }
 
     return null;
   }
 
   /**
-   * Evaluate the query operator for boolean retrieval models.
+   * Return a string version of this query operator.
    *
-   * @param r A retrieval model that controls how the operator behaves.
-   * @return The result of evaluating the query.
-   * @throws IOException
+   * @return The string version of this query operator.
    */
+  public String toString() {
+
+    String result = new String();
+
+    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
+      result += (i.next().toString() + " ");
+    }
+
+    return ("#SCORE( " + result + ")");
+  }
+
   private QryResult evaluateBoolean(RetrievalModel r) throws IOException {
 
     // Evaluate the query argument.
@@ -98,13 +137,6 @@ public class QryopSlScore extends QryopSl {
     return result;
   }
 
-  /**
-   * Evaluate the query operator for boolean retrieval models.
-   *
-   * @param r A retrieval model that controls how the operator behaves.
-   * @return The result of evaluating the query.
-   * @throws IOException
-   */
   private QryResult evaluateRankedBoolean(RetrievalModel r) throws IOException {
     QryResult result = args.get(0).evaluate(r);
 
@@ -114,7 +146,7 @@ public class QryopSlScore extends QryopSl {
 
     for (int i = 0; i < result.invertedList.df; i++) {
       int docId = result.invertedList.postings.get(i).docid,
-              tf = result.invertedList.postings.get(i).tf;
+              tf = result.invertedList.getTf(i);
       result.docScores.add(docId, tf);
     }
 
@@ -125,36 +157,80 @@ public class QryopSlScore extends QryopSl {
     return result;
   }
 
-  /*
-   *  Calculate the default score for a document that does not match
-   *  the query argument.  This score is 0 for many retrieval models,
-   *  but not all retrieval models.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @param docid The internal id of the document that needs a default score.
-   *  @return The default score.
-   */
-  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
+  private QryResult evaluateBM25(RetrievalModel r) throws IOException {
+    QryResult result = args.get(0).evaluate(r);
 
-    if (r instanceof RetrievalModelUnrankedBoolean) {
-      return (0.0);
+    // necessary info to calculate BM 25 scores
+    double k_1 = ((RetrievalModelBM25) r).getK_1(),
+            k_3 = ((RetrievalModelBM25) r).getK_3(),
+            b = ((RetrievalModelBM25) r).getB();
+    String field = result.invertedList.field;
+    double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
+            (float) QryEval.READER.getDocCount(field);
+    DocLengthStore docLengthStore = new DocLengthStore(QryEval.READER);
+
+    // idf
+    int df = result.invertedList.df;
+    double idf = Math.log((QryEval.READER.getDocCount(field) - df + 0.5) / (df + 0.5));
+    // user weight from qtf, suppose always 1
+    double userWeight = (k_3 + 1) / (k_3 + 1);
+
+    for (int i = 0; i < df; ++i) {
+      int docid = result.invertedList.postings.get(i).docid;
+      long doclen = docLengthStore.getDocLength(field, docid);
+      int tf = result.invertedList.getTf(i);
+      double normTf = tf / (tf + k_1 * (1 - b + b * doclen / avgDocLen));
+      // store the score!
+      result.docScores.add(docid, idf * normTf * userWeight);
     }
 
-    return 0.0;
+    if (result.invertedList.df > 0) {
+      result.invertedList = new InvList();
+    }
+
+    return result;
+
+  }
+
+  private QryResult evaluateIndri(RetrievalModel r) throws IOException {
+    QryResult result = args.get(0).evaluate(r);
+
+    // necessary info to calculate query likelihood
+    int mu = ((RetrievalModelIndri) r).getMu();
+    double lambda = ((RetrievalModelIndri) r).getLambda();
+    int df = result.invertedList.df;
+    DocLengthStore docLengthStore = new DocLengthStore(QryEval.READER);
+    field = result.invertedList.field;
+    double ctfProb = ((float) result.invertedList.ctf) / QryEval.READER.getSumTotalTermFreq(field);
+    // calculate the 2 parameters in query likelihood calculation
+    ctfParam1 = mu * ctfProb;
+    ctfParam2 = (1 - lambda) * ctfProb;
+
+    for (int i = 0; i < df; ++i) {
+      int docid = result.invertedList.postings.get(i).docid;
+      long doclen = docLengthStore.getDocLength(field, docid);
+      int tf = result.invertedList.getTf(i);
+      double logScaleScore = Math.log(lambda * (tf + mu * ctfParam1) / (doclen + mu) + ctfParam2);
+      // store the scores!
+      result.docScores.add(docid, logScaleScore);
+    }
+
+    if (result.invertedList.df > 0) {
+      result.invertedList = new InvList();
+    }
+    return result;
   }
 
   /**
-   * Return a string version of this query operator.
-   *
-   * @return The string version of this query operator.
+   * Records the data to calculate default score for Indri
+   * query operation after evaluation
    */
-  public String toString() {
+  private double ctfParam1 = -1, ctfParam2 = -1;
 
-    String result = new String();
-
-    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
-      result += (i.next().toString() + " ");
-    }
-
-    return ("#SCORE( " + result + ")");
-  }
+  /**
+   * Denotes the field of the original inverted list. Since
+   * #Score only covers QryopIl with one particular field,
+   * it can be recorded during evaluation.
+   */
+  private String field;
 }

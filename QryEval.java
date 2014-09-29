@@ -62,7 +62,7 @@ public class QryEval {
     // read in the parameter file; one parameter per line in format of key=value
     Map<String, String> params = new HashMap<String, String>();
     Scanner scan = new Scanner(new File(args[0]));
-    String line = null;
+    String line;
     do {
       line = scan.nextLine();
       String[] pair = line.split("=");
@@ -111,6 +111,7 @@ public class QryEval {
       e.printStackTrace();
       fatalError("Error: Read/Evaluate query file failed.");
     } finally {
+      assert queryFileReader != null;
       queryFileReader.close();
     }
 
@@ -144,8 +145,9 @@ public class QryEval {
       fatalError("Error: Write trec-eval results failed.");
     } finally {
       try {
+        assert writer != null;
         writer.close();
-      } catch (Exception e) {
+      } catch (Exception ignored) {
       }
     }
 
@@ -174,8 +176,7 @@ public class QryEval {
    */
   static String getExternalDocid(int iid) throws IOException {
     Document d = QryEval.READER.document(iid);
-    String eid = d.get("externalId");
-    return eid;
+    return d.get("externalId");
   }
 
   /**
@@ -284,6 +285,7 @@ public class QryEval {
 
         String[] tokenizeResult = tokenizeQuery(token);
         if (tokenizeResult.length != 0) {
+          assert currentOp != null;
           currentOp.add(new QryopIlTerm(tokenizeResult[0], tokenField));
         }
       }

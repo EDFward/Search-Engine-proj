@@ -1,7 +1,8 @@
 /**
- * Created by hejunjia1911 on 9/4/14.
+ * Ranked Boolean retrieval model in homework 1.
+ *
+ * @author junjiah
  */
-
 public class RetrievalModelRankedBoolean extends RetrievalModel {
 
   /**
@@ -14,7 +15,7 @@ public class RetrievalModelRankedBoolean extends RetrievalModel {
   @Override
   public boolean setParameter(String parameterName, double value) {
     System.err.println("Error: Unknown parameter name for retrieval model " +
-            "UnrankedBoolean: " +
+            "RankedBoolean: " +
             parameterName);
     return false;
   }
@@ -29,7 +30,7 @@ public class RetrievalModelRankedBoolean extends RetrievalModel {
   @Override
   public boolean setParameter(String parameterName, String value) {
     System.err.println("Error: Unknown parameter name for retrieval model " +
-            "UnrankedBoolean: " +
+            "RankedBoolean: " +
             parameterName);
     return false;
   }
