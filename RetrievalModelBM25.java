@@ -6,6 +6,10 @@ import java.io.IOException;
  * @author junjiah
  */
 public class RetrievalModelBM25 extends RetrievalModel {
+
+  /**
+   * Initialize the document length reader for future evaluation.
+   */
   public RetrievalModelBM25() {
     try {
       docLengthStore = new DocLengthStore(QryEval.READER);
@@ -84,6 +88,13 @@ public class RetrievalModelBM25 extends RetrievalModel {
   }
 
   /**
+   * Parameter lambda in query likelihood calculation.
+   */
+  public DocLengthStore getDocLengthStore() {
+    return docLengthStore;
+  }
+
+  /**
    * Parameter K1 in BM25 retrieval model.
    */
   private double k_1;
@@ -98,9 +109,8 @@ public class RetrievalModelBM25 extends RetrievalModel {
    */
   private double b;
 
-  public DocLengthStore getDocLengthStore() {
-    return docLengthStore;
-  }
-
+  /**
+   * Document length reader.
+   */
   private DocLengthStore docLengthStore;
 }

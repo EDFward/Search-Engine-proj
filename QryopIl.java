@@ -23,9 +23,9 @@ public abstract class QryopIl extends Qryop {
    */
   public void allocDaaTPtrs(RetrievalModel r) throws IOException {
 
-    for (int i = 0; i < this.args.size(); i++) {
+    for (Qryop arg : this.args) {
       DaaTPtr ptri = new DaaTPtr();
-      ptri.invList = this.args.get(i).evaluate(r).invertedList;
+      ptri.invList = arg.evaluate(r).invertedList;
       ptri.scoreList = null;
       ptri.nextDoc = 0;
 

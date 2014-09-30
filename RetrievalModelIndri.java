@@ -1,10 +1,15 @@
 import java.io.IOException;
 
 /**
- * Created by junjiah on 9/28/14.
+ * Indri retrieval model in homework2
+ *
+ * @author junjiah
  */
 public class RetrievalModelIndri extends RetrievalModel {
 
+  /**
+   * Initialize the document length reader for future evaluation.
+   */
   public RetrievalModelIndri() {
     try {
       docLengthStore = new DocLengthStore(QryEval.READER);
@@ -72,6 +77,13 @@ public class RetrievalModelIndri extends RetrievalModel {
   }
 
   /**
+   * @return document length reader
+   */
+  public DocLengthStore getDocLengthStore() {
+    return docLengthStore;
+  }
+
+  /**
    * Parameter mu in query likelihood calculation.
    */
   private int mu;
@@ -81,9 +93,8 @@ public class RetrievalModelIndri extends RetrievalModel {
    */
   private double lambda;
 
-  public DocLengthStore getDocLengthStore() {
-    return docLengthStore;
-  }
-
+  /**
+   * Document length reader.
+   */
   private DocLengthStore docLengthStore;
 }

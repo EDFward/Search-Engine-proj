@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -12,12 +13,10 @@ public class QryopSlSum extends QryopSl {
   /**
    * Constructs QryopSlSum with specified query operators
    *
-   * @param q
+   * @param q Child query operators under this one.
    */
   public QryopSlSum(Qryop... q) {
-    for (int i = 0; i < q.length; i++) {
-      this.args.add(q[i]);
-    }
+    Collections.addAll(this.args, q);
   }
 
   @Override
@@ -107,9 +106,9 @@ public class QryopSlSum extends QryopSl {
    */
   @Override
   public String toString() {
-    String result = new String();
-    for (int i = 0; i < this.args.size(); i++) {
-      result += this.args.get(i).toString() + " ";
+    String result = "";
+    for (Qryop arg : this.args) {
+      result += arg.toString() + " ";
     }
     return ("#SUM( " + result + ")");
   }

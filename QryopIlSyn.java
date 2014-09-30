@@ -11,7 +11,6 @@
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 public class QryopIlSyn extends QryopIl {
@@ -21,18 +20,15 @@ public class QryopIlSyn extends QryopIl {
    * of arguments. Thus new QryopIlSyn (arg1, arg2, arg3, ...).
    */
   public QryopIlSyn(Qryop... q) {
-    for (int i = 0; i < q.length; i++) {
-      this.args.add(q[i]);
-    }
+    Collections.addAll(this.args, q);
   }
 
   /**
    * Appends an argument to the list of query operator arguments.  This
    * simplifies the design of some query parsing architectures.
    *
-   * @param {q} q The query argument (query operator) to append.
+   * @param a The query argument (query operator) to append.
    * @return void
-   * @throws IOException
    */
   public void add(Qryop a) {
     this.args.add(a);
@@ -54,7 +50,7 @@ public class QryopIlSyn extends QryopIl {
     syntaxCheckArgResults(this.daatPtrs);
 
     QryResult result = new QryResult();
-    result.invertedList.field = new String(this.daatPtrs.get(0).invList.field);
+    result.invertedList.field = this.daatPtrs.get(0).invList.field;
 
     //  Each pass of the loop adds 1 document to result until all of
     //  the inverted lists are depleted.  When a list is depleted, it
@@ -72,9 +68,7 @@ public class QryopIlSyn extends QryopIl {
 
       List<Integer> positions = new ArrayList<Integer>();
 
-      for (int i = 0; i < this.daatPtrs.size(); i++) {
-        DaaTPtr ptri = this.daatPtrs.get(i);
-
+      for (DaaTPtr ptri : this.daatPtrs) {
         if (ptri.invList.getDocid(ptri.nextDoc) == nextDocid) {
           positions.addAll(ptri.invList.postings.get(ptri.nextDoc).positions);
           ptri.nextDoc++;
@@ -108,10 +102,10 @@ public class QryopIlSyn extends QryopIl {
    */
   public String toString() {
 
-    String result = new String();
+    String result = "";
 
-    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
-      result += (i.next().toString() + " ");
+    for (Qryop arg : this.args) {
+      result += (arg.toString() + " ");
     }
 
     return ("#SYN( " + result + ")");
@@ -126,8 +120,7 @@ public class QryopIlSyn extends QryopIl {
 
     int nextDocid = Integer.MAX_VALUE;
 
-    for (int i = 0; i < this.daatPtrs.size(); i++) {
-      DaaTPtr ptri = this.daatPtrs.get(i);
+    for (DaaTPtr ptri : this.daatPtrs) {
       if (nextDocid > ptri.invList.getDocid(ptri.nextDoc)) {
         nextDocid = ptri.invList.getDocid(ptri.nextDoc);
       }

@@ -52,6 +52,8 @@ public class QryEval {
    * @throws Exception
    */
   public static void main(String[] args) throws Exception {
+    // when everything begins
+    final long startTime = System.currentTimeMillis();
 
     // must supply parameter file
     if (args.length < 1) {
@@ -167,6 +169,9 @@ public class QryEval {
       }
     }
 
+    // print evaluation time
+    final long endTime = System.currentTimeMillis();
+    System.out.println("Total evaluation time: " + (endTime - startTime) / 1000.0 + " seconds");
     printMemoryUsage(false);
   }
 

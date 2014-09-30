@@ -12,7 +12,7 @@ public class QryopIlNear extends QryopIl {
   /**
    * Appends an argument to the list of query operator arguments.
    *
-   * @param {q} q The query argument (query operator) to append.
+   * @param q The query argument (query operator) to append.
    * @return void
    */
   @Override
@@ -108,26 +108,13 @@ public class QryopIlNear extends QryopIl {
    */
   @Override
   public String toString() {
-    String result = new String();
+    String result = "";
 
     for (Qryop arg : this.args) {
       result += arg.toString() + " ";
     }
 
     return "#NEAR/" + distance + "( " + result + ")";
-  }
-
-  /**
-   * Calculate the default score for the specified document if it
-   * does not match the query operator.  This score is 0 for many
-   * retrieval models, but not all retrieval models.
-   *
-   * @param r     A retrieval model that controls how the operator behaves.
-   * @param docid The internal id of the document that needs a default score.
-   * @return The default score.
-   */
-  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
-    return 0.0;
   }
 
   /**

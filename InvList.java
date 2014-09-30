@@ -32,16 +32,16 @@ public class InvList {
     public DocPosting(int d, int... locations) {
       this.docid = d;
       this.tf = locations.length;
-      for (int i = 0; i < locations.length; i++) {
-        this.positions.add(locations[i]);
+      for (int location : locations) {
+        this.positions.add(location);
       }
     }
 
     public DocPosting(int d, List<Integer> locations) {
       this.docid = d;
       this.tf = locations.size();
-      for (int i = 0; i < locations.size(); i++) {
-        this.positions.add(locations.get(i));
+      for (Integer location : locations) {
+        this.positions.add(location);
       }
     }
   }
@@ -66,7 +66,7 @@ public class InvList {
    * Constructor.
    */
   public InvList(String fieldString) {
-    this.field = new String(fieldString);
+    this.field = fieldString;
   }
 
   /**
@@ -80,7 +80,7 @@ public class InvList {
 
     //  Store the field name.  This is used by other query operators.
 
-    this.field = new String(fieldString);
+    this.field = fieldString;
 
     //  Prepare to access the index.
 
@@ -124,7 +124,7 @@ public class InvList {
    *
    * @param docid     The posting internal document id.
    * @param positions A list of positions where the term occurs.
-   * @result true if the posting was added successfully, otherwise false.
+   * @return true if the posting was added successfully, otherwise false.
    */
   public boolean appendPosting(int docid, List<Integer> positions) {
 

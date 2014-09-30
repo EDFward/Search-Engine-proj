@@ -69,18 +69,15 @@ public class ScoreList {
      * getExternalDocid only gets called once for every docs
      */
     int scoreListSize = scores.size();
-    final Map<ScoreListEntry, String> externalIds = new HashMap<ScoreListEntry, String>(
-            scoreListSize);
-    for (int i = 0; i < scoreListSize; ++i) {
-      ScoreListEntry entry = scores.get(i);
-      externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
-    }
+    final Map<ScoreListEntry, String> externalIds = new HashMap<ScoreListEntry, String>();
 
     if (scoreListSize > 100) {
       // keep a min heap to maintain highest score entries
       ScoreListEntry[] heap = new ScoreListEntry[100];
       for (int i = 0; i < 100; ++i) {
-        heap[i] = scores.get(i);
+        ScoreListEntry entry = scores.get(i);
+        heap[i] = entry;
+        externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
       }
 
       // heapify
@@ -115,6 +112,12 @@ public class ScoreList {
       // update the scores to keep only 100 entries
       scores.clear();
       scores.addAll(Arrays.asList(heap));
+    }
+    else {
+      // otherwise store the external ID and then directly sort
+      for (ScoreListEntry entry : scores) {
+        externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
+      }
     }
 
     // now `scores` has elements <= 100, ok to sort (and the external ids
