@@ -8,9 +8,7 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import javax.swing.event.DocumentListener;
 import java.io.IOException;
-import java.util.Iterator;
 
 public class QryopSlScore extends QryopSl {
 
@@ -23,16 +21,6 @@ public class QryopSlScore extends QryopSl {
    */
   public QryopSlScore(Qryop q) {
     this.args.add(q);
-  }
-
-  /**
-   * Construct a new SCORE operator.  Allow a SCORE operator to be
-   * created with no arguments.  This simplifies the design of some
-   * query parsing architectures.
-   *
-   * @return @link{QryopSlScore}
-   */
-  public QryopSlScore() {
   }
 
   /**
@@ -56,15 +44,17 @@ public class QryopSlScore extends QryopSl {
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
 
     if (r instanceof RetrievalModelIndri) {
-      if (ctfParam1 == -1 || ctfParam2 == -1) {
-        System.err.println("Error: default score parameters not set up.");
-        return 0;
+      if (ctfProb == -1) {
+        QryEval.fatalError("Error: default score parameters not set up.");
       }
+      DocLengthStore docLengthStore = ((RetrievalModelIndri) r).getDocLengthStore();
       int mu = ((RetrievalModelIndri) r).getMu();
       double lambda = ((RetrievalModelIndri) r).getLambda();
-      DocLengthStore docLengthScore = new DocLengthStore(QryEval.READER);
-      long doclen = docLengthScore.getDocLength(field, (int) docid);
-      return Math.log(lambda * ( mu * ctfParam1) / (doclen + mu) + ctfParam2);
+      long doclen = docLengthStore.getDocLength(field, (int) docid);
+      double ctfParam1 = mu * ctfProb;
+      double ctfParam2 = (1 - lambda) * ctfProb;
+
+      return Math.log(lambda * ctfParam1 / (doclen + mu) + ctfParam2);
     }
 
     return 0.0;
@@ -99,10 +89,10 @@ public class QryopSlScore extends QryopSl {
    */
   public String toString() {
 
-    String result = new String();
+    String result = "";
 
-    for (Iterator<Qryop> i = this.args.iterator(); i.hasNext(); ) {
-      result += (i.next().toString() + " ");
+    for (Qryop arg : this.args) {
+      result += (arg.toString() + " ");
     }
 
     return ("#SCORE( " + result + ")");
@@ -162,26 +152,23 @@ public class QryopSlScore extends QryopSl {
 
     // necessary info to calculate BM 25 scores
     double k_1 = ((RetrievalModelBM25) r).getK_1(),
-            k_3 = ((RetrievalModelBM25) r).getK_3(),
             b = ((RetrievalModelBM25) r).getB();
+    DocLengthStore docLengthStore = ((RetrievalModelBM25) r).getDocLengthStore();
     String field = result.invertedList.field;
     double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
             (float) QryEval.READER.getDocCount(field);
-    DocLengthStore docLengthStore = new DocLengthStore(QryEval.READER);
 
     // idf
     int df = result.invertedList.df;
     double idf = Math.log((QryEval.READER.getDocCount(field) - df + 0.5) / (df + 0.5));
-    // user weight from qtf, suppose always 1
-    double userWeight = (k_3 + 1) / (k_3 + 1);
 
     for (int i = 0; i < df; ++i) {
       int docid = result.invertedList.postings.get(i).docid;
       long doclen = docLengthStore.getDocLength(field, docid);
       int tf = result.invertedList.getTf(i);
       double normTf = tf / (tf + k_1 * (1 - b + b * doclen / avgDocLen));
-      // store the score!
-      result.docScores.add(docid, idf * normTf * userWeight);
+      // store the score! (without user weight)
+      result.docScores.add(docid, idf * normTf);
     }
 
     if (result.invertedList.df > 0) {
@@ -198,19 +185,19 @@ public class QryopSlScore extends QryopSl {
     // necessary info to calculate query likelihood
     int mu = ((RetrievalModelIndri) r).getMu();
     double lambda = ((RetrievalModelIndri) r).getLambda();
+    DocLengthStore docLengthStore = ((RetrievalModelIndri) r).getDocLengthStore();
     int df = result.invertedList.df;
-    DocLengthStore docLengthStore = new DocLengthStore(QryEval.READER);
     field = result.invertedList.field;
-    double ctfProb = ((float) result.invertedList.ctf) / QryEval.READER.getSumTotalTermFreq(field);
     // calculate the 2 parameters in query likelihood calculation
-    ctfParam1 = mu * ctfProb;
-    ctfParam2 = (1 - lambda) * ctfProb;
+    ctfProb = ((float) result.invertedList.ctf) / QryEval.READER.getSumTotalTermFreq(field);
+    double ctfParam1 = mu * ctfProb;
+    double ctfParam2 = (1 - lambda) * ctfProb;
 
     for (int i = 0; i < df; ++i) {
       int docid = result.invertedList.postings.get(i).docid;
       long doclen = docLengthStore.getDocLength(field, docid);
       int tf = result.invertedList.getTf(i);
-      double logScaleScore = Math.log(lambda * (tf + mu * ctfParam1) / (doclen + mu) + ctfParam2);
+      double logScaleScore = Math.log(lambda * (tf + ctfParam1) / (doclen + mu) + ctfParam2);
       // store the scores!
       result.docScores.add(docid, logScaleScore);
     }
@@ -225,7 +212,7 @@ public class QryopSlScore extends QryopSl {
    * Records the data to calculate default score for Indri
    * query operation after evaluation
    */
-  private double ctfParam1 = -1, ctfParam2 = -1;
+  private double ctfProb = -1;
 
   /**
    * Denotes the field of the original inverted list. Since

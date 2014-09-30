@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-public class QryopIlSyn extends QryopSl {
+public class QryopIlSyn extends QryopIl {
 
   /**
    * It is convenient for the constructor to accept a variable number
@@ -115,11 +115,6 @@ public class QryopIlSyn extends QryopSl {
     }
 
     return ("#SYN( " + result + ")");
-  }
-
-  @Override
-  public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
-    return 0;
   }
 
   /**

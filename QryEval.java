@@ -88,7 +88,6 @@ public class QryEval {
       model = (RetrievalModel) Class.forName(
               "RetrievalModel" + params.get("retrievalAlgorithm")).newInstance();
     } catch (Exception e) {
-      e.printStackTrace();
       fatalError("Error: Failed to load specified retrieval model.");
     }
 
@@ -98,31 +97,48 @@ public class QryEval {
     try {
       queryFileReader = new BufferedReader(new FileReader(params.get("queryFilePath")));
 
-      while ((line = queryFileReader.readLine())!= null) {
+      while ((line = queryFileReader.readLine()) != null) {
         line = line.trim();
-        if (line.isEmpty())
+        if (line.isEmpty()) {
           break;
+        }
 
         String[] parts = line.split(":", 2);
         // add queryId: queryString to the map
         queryStrings.put(Integer.parseInt(parts[0]), parts[1]);
       }
     } catch (Exception e) {
-      e.printStackTrace();
       fatalError("Error: Read/Evaluate query file failed.");
     } finally {
       assert queryFileReader != null;
       queryFileReader.close();
     }
 
-    // Create the trec_eval output.
+    // evaluate and create the trec_eval output.
     BufferedWriter writer = null;
     try {
       writer = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
+      // add default query operator depending on retrieval model
+      // and set parameters accordingly
+      Qryop defaultQryop;
+      if (model instanceof RetrievalModelBM25) {
+        model.setParameter("k_1", params.get("BM25:k_1"));
+        model.setParameter("k_3", params.get("BM25:k_3"));
+        model.setParameter("b", params.get("BM25:b"));
+        defaultQryop = new QryopSlSum();
+      } else if (model instanceof RetrievalModelIndri) {
+        model.setParameter("mu", params.get("Indri:mu"));
+        model.setParameter("lambda", params.get("Indri:lambda"));
+        defaultQryop = new QryopSlAnd();
+      } else {
+        // no parameter to read
+        defaultQryop = new QryopSlOr();
+      }
 
       for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
-        // evaluate the query
-        QryResult result = parseQuery(entry.getValue()).evaluate(model);
+        defaultQryop.clear();
+        // parse the query, then evaluate
+        QryResult result = parseQuery(entry.getValue(), defaultQryop).evaluate(model);
         // sort and truncate to 100 if necessary
         result.docScores.sortAndTruncate();
         int queryId = entry.getKey();
@@ -131,7 +147,7 @@ public class QryEval {
           writer.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
           for (int j = 0; j < result.docScores.scores.size(); ++j) {
-            String s = String.format("%d Q0 %s %d %.2f run-1\n",
+            String s = String.format("%d Q0 %s %d %.10f run-1\n",
                     queryId,                                              // query id
                     getExternalDocid(result.docScores.getDocid(j)), // external id
                     j + 1,                                          // rank
@@ -142,7 +158,7 @@ public class QryEval {
       }
     } catch (Exception e) {
       e.printStackTrace();
-      fatalError("Error: Write trec-eval results failed.");
+      fatalError("Error: evaluation failed.");
     } finally {
       try {
         assert writer != null;
@@ -206,24 +222,21 @@ public class QryEval {
   /**
    * parseQuery converts a query string into a query tree.
    *
-   * @param qString A string containing a query.
-   * @return qTree   A query tree
+   * @param qString      A string containing a query.
+   * @param defaultQryop Default query operator to be pushed on stack at first.
+   * @return A query tree
    * @throws IOException
    */
-  static Qryop parseQuery(String qString) throws IOException {
+  static Qryop parseQuery(String qString, Qryop defaultQryop) throws IOException {
 
-    Qryop currentOp = null;
+    Qryop currentOp = defaultQryop;
     Stack<Qryop> stack = new Stack<Qryop>();
+    stack.push(currentOp);
 
     // Add a default query operator to an unstructured query. This
     // is a tiny bit easier if unnecessary whitespace is removed.
 
     qString = qString.trim();
-
-    if (qString.charAt(0) != '#' ||
-            qString.toLowerCase().startsWith("#near")) {
-      qString = "#or(" + qString + ")";
-    }
 
     // Tokenize the query.
 
@@ -248,6 +261,9 @@ public class QryEval {
         stack.push(currentOp);
       } else if (token.equalsIgnoreCase("#or")) {
         currentOp = new QryopSlOr();
+        stack.push(currentOp);
+      } else if (token.equalsIgnoreCase("#sum")) {
+        currentOp = new QryopSlSum();
         stack.push(currentOp);
       } else if (token.toLowerCase().startsWith("#near")) {
         try {

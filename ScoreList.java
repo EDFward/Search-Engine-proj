@@ -137,8 +137,8 @@ public class ScoreList {
   /**
    * Sift-down operation for heap structure.
    *
-   * @param h Heap as a fixed length array
-   * @param pos Position in the heap to be sifted down
+   * @param h           Heap as a fixed length array
+   * @param pos         Position in the heap to be sifted down
    * @param externalIds Doc-ExternalId map for comparision
    */
   private static void sink(ScoreListEntry[] h, int pos, Map<ScoreListEntry, String> externalIds) {

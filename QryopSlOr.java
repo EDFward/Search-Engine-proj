@@ -1,5 +1,7 @@
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class QryopSlOr extends QryopSl {
 
@@ -53,8 +55,9 @@ public class QryopSlOr extends QryopSl {
   }
 
   /**
-   *  Return a string version of this query operator.
-   *  @return The string version of this query operator.
+   * Return a string version of this query operator.
+   *
+   * @return The string version of this query operator.
    */
   @Override
   public String toString() {
@@ -81,8 +84,7 @@ public class QryopSlOr extends QryopSl {
 
     // iterate all daat ptrs and find the smallest docid,
     // and record scores accordingly
-    while (this.daatPtrs.size() > 0)
-    {
+    while (this.daatPtrs.size() > 0) {
       // record daat ptrs with min docid; advance their nextdoc later
       List<DaaTPtr> minDaatPtr = new ArrayList<DaaTPtr>();
       int minDocId = Integer.MAX_VALUE;
@@ -102,15 +104,18 @@ public class QryopSlOr extends QryopSl {
           minDocId = currDocId;
           minDaatPtr.clear();
           minDaatPtr.add(dp);
-        } else if (currDocId == minDocId)
+        } else if (currDocId == minDocId) {
           minDaatPtr.add(dp);
+        }
       }
       // ignore if no more daatPtr
-      if (minDocId != Integer.MAX_VALUE)
+      if (minDocId != Integer.MAX_VALUE) {
         result.docScores.add(minDocId, 1.0);
+      }
       // advance minDaatPtr's nextdoc since their doc have been processed
-      for (DaaTPtr dp : minDaatPtr)
+      for (DaaTPtr dp : minDaatPtr) {
         dp.nextDoc++;
+      }
     }
     freeDaaTPtrs();
     return result;
@@ -130,8 +135,7 @@ public class QryopSlOr extends QryopSl {
 
     // iterate all daat ptrs and find the smallest docid,
     // and record scores accordingly
-    while (this.daatPtrs.size() > 0)
-    {
+    while (this.daatPtrs.size() > 0) {
       // record daat ptrs with min docid; advance their nextdoc later
       List<DaaTPtr> minDaatPtr = new ArrayList<DaaTPtr>();
       int minDocId = Integer.MAX_VALUE;
@@ -156,16 +160,19 @@ public class QryopSlOr extends QryopSl {
         } else if (currDocId == minDocId) {
           minDaatPtr.add(dp);
           double currScore = dp.scoreList.getDocidScore(dp.nextDoc);
-          if (currScore > maxScore)
+          if (currScore > maxScore) {
             maxScore = currScore;
+          }
         }
       }
       // ignore if no more daatPtr
-      if (minDocId != Integer.MAX_VALUE)
+      if (minDocId != Integer.MAX_VALUE) {
         result.docScores.add(minDocId, maxScore);
+      }
       // advance minDaatPtr's nextdoc since their doc have been processed
-      for (DaaTPtr dp : minDaatPtr)
+      for (DaaTPtr dp : minDaatPtr) {
         dp.nextDoc++;
+      }
     }
     freeDaaTPtrs();
     return result;

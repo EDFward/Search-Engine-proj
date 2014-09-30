@@ -39,11 +39,18 @@ public abstract class Qryop {
    * Appends an argument to the list of query operator arguments.  This
    * simplifies the design of some query parsing architectures.
    *
-   * @param {q} q The query argument (query operator) to append.
+   * @param q The query argument (query operator) to append.
    * @return void
    * @throws IOException
    */
   public abstract void add(Qryop q) throws IOException;
+
+  /**
+   * Clear the query operators in args.
+   */
+  public void clear() {
+    args.clear();
+  }
 
   /**
    * Use the specified retrieval model to evaluate the query arguments.
@@ -85,12 +92,9 @@ public abstract class Qryop {
     this.args.remove(i);
   }
 
-  ;
-
   /*
-   *  Return a string version of this query operator.  
+   *  Return a string version of this query operator.
    *  @return The string version of this query operator.
    */
   public abstract String toString();
-
 }

@@ -1,6 +1,5 @@
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Vector;
 
@@ -35,7 +34,7 @@ public class QryopIlNear extends QryopIl {
     syntaxCheckArgResults(this.daatPtrs);
 
     QryResult result = new QryResult();
-    result.invertedList.field = new String(this.daatPtrs.get(0).invList.field);
+    result.invertedList.field = this.daatPtrs.get(0).invList.field;
     DaaTPtr ptr0 = this.daatPtrs.get(0);
 
     ITERATE_DOCS:
@@ -81,9 +80,10 @@ public class QryopIlNear extends QryopIl {
               } else {                           // otherwise check next ptr0Pos,
                 continue ITERATE_POSTING;        // since this one is impossible
               }
-            }
-            else // try ptrjPos until greater than ptr0Pos
+            } else // try ptrjPos until greater than ptr0Pos
+            {
               continue;
+            }
           }
           // if all positions of ptrj are smaller than ptr0Pos,
           // this doc cannot satisfy NEAR's requirements,
@@ -102,8 +102,9 @@ public class QryopIlNear extends QryopIl {
   }
 
   /**
-   *  Return a string version of this query operator.
-   *  @return The string version of this query operator.
+   * Return a string version of this query operator.
+   *
+   * @return The string version of this query operator.
    */
   @Override
   public String toString() {
@@ -117,12 +118,13 @@ public class QryopIlNear extends QryopIl {
   }
 
   /**
-   *  Calculate the default score for the specified document if it
-   *  does not match the query operator.  This score is 0 for many
-   *  retrieval models, but not all retrieval models.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @param docid The internal id of the document that needs a default score.
-   *  @return The default score.
+   * Calculate the default score for the specified document if it
+   * does not match the query operator.  This score is 0 for many
+   * retrieval models, but not all retrieval models.
+   *
+   * @param r     A retrieval model that controls how the operator behaves.
+   * @param docid The internal id of the document that needs a default score.
+   * @return The default score.
    */
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
     return 0.0;

@@ -1,7 +1,18 @@
+import java.io.IOException;
+
 /**
  * Created by junjiah on 9/28/14.
  */
 public class RetrievalModelIndri extends RetrievalModel {
+
+  public RetrievalModelIndri() {
+    try {
+      docLengthStore = new DocLengthStore(QryEval.READER);
+    } catch (IOException e) {
+      QryEval.fatalError("Error: DocLengthStore initialization error");
+    }
+  }
+
   /**
    * Set a retrieval model parameter.
    *
@@ -13,15 +24,12 @@ public class RetrievalModelIndri extends RetrievalModel {
   public boolean setParameter(String parameterName, double value) {
     if (parameterName.equals("mu")) {
       mu = (int) value;
-    }
-    else if (parameterName.equals("lambda")) {
+    } else if (parameterName.equals("lambda")) {
       lambda = value;
-    }
-    else {
-      System.err.println("Error: Unknown parameter name for retrieval model " +
+    } else {
+      QryEval.fatalError("Error: Unknown parameter name for retrieval model " +
               "RankedBoolean: " +
               parameterName);
-      return false;
     }
     // successfully set up the parameter
     return true;
@@ -36,14 +44,20 @@ public class RetrievalModelIndri extends RetrievalModel {
    */
   @Override
   public boolean setParameter(String parameterName, String value) {
-    System.err.println("Error: Unknown parameter name for retrieval model " +
-            "RankedBoolean: " +
-            parameterName);
-    return false;
+    if (parameterName.equals("mu")) {
+      mu = Integer.parseInt(value);
+    } else if (parameterName.equals("lambda")) {
+      lambda = Double.parseDouble(value);
+    } else {
+      QryEval.fatalError("Error: Unknown parameter name for retrieval model " +
+              "RankedBoolean: " +
+              parameterName);
+    }
+    // successfully set up the parameter
+    return true;
   }
 
   /**
-   *
    * @return lambda in two-state smoothing
    */
   public double getLambda() {
@@ -51,7 +65,6 @@ public class RetrievalModelIndri extends RetrievalModel {
   }
 
   /**
-   *
    * @return mu in two-state smoothing
    */
   public int getMu() {
@@ -67,4 +80,10 @@ public class RetrievalModelIndri extends RetrievalModel {
    * Parameter lambda in query likelihood calculation.
    */
   private double lambda;
+
+  public DocLengthStore getDocLengthStore() {
+    return docLengthStore;
+  }
+
+  private DocLengthStore docLengthStore;
 }

@@ -5,7 +5,8 @@
  */
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.ListIterator;
 
 public class QryopSlAnd extends QryopSl {
 
@@ -16,9 +17,7 @@ public class QryopSlAnd extends QryopSl {
    * @param q A query argument (a query operator).
    */
   public QryopSlAnd(Qryop... q) {
-    for (int i = 0; i < q.length; i++) {
-      this.args.add(q[i]);
-    }
+    Collections.addAll(this.args, q);
   }
 
   /**
@@ -27,7 +26,6 @@ public class QryopSlAnd extends QryopSl {
    *
    * @param a q The query argument (query operator) to append.
    * @return void
-   * @throws IOException
    */
   public void add(Qryop a) {
     this.args.add(a);
@@ -55,12 +53,13 @@ public class QryopSlAnd extends QryopSl {
   }
 
   /**
-   *  Calculate the default score for the specified document if it
-   *  does not match the query operator.  This score is 0 for many
-   *  retrieval models, but not all retrieval models.
-   *  @param r A retrieval model that controls how the operator behaves.
-   *  @param docid The internal id of the document that needs a default score.
-   *  @return The default score.
+   * Calculate the default score for the specified document if it
+   * does not match the query operator.  This score is 0 for many
+   * retrieval models, but not all retrieval models.
+   *
+   * @param r     A retrieval model that controls how the operator behaves.
+   * @param docid The internal id of the document that needs a default score.
+   * @return The default score.
    */
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
     if (r instanceof RetrievalModelIndri) {
@@ -68,7 +67,7 @@ public class QryopSlAnd extends QryopSl {
       for (Qryop arg : args) {
         // they must be QryopSl, so downcast.
         // since they are in log scale, sum them up
-        defaultScore += ((QryopSl)arg).getDefaultScore(r, docid);
+        defaultScore += ((QryopSl) arg).getDefaultScore(r, docid);
       }
       // normalization from query terms
       return defaultScore / args.size();
@@ -78,12 +77,13 @@ public class QryopSlAnd extends QryopSl {
   }
 
   /**
-   *  Return a string version of this query operator.
-   *  @return The string version of this query operator.
+   * Return a string version of this query operator.
+   *
+   * @return The string version of this query operator.
    */
   public String toString() {
 
-    String result = new String();
+    String result = "";
 
     for (Qryop arg : this.args) {
       result += arg.toString() + " ";
@@ -201,27 +201,26 @@ public class QryopSlAnd extends QryopSl {
     QryResult result = new QryResult();
 
     int minDocId;
-    // iterate all daat ptrs and find the smallest docid,
+    // iterate all daat ptrs and find the smallest doc ID,
     // and record scores accordingly
-    do
-    {
-      minDocId = getSmallestCurrentDocid();
-      double termScore = 0;
+    while ((minDocId = getSmallestCurrentDocid()) != Integer.MAX_VALUE) {
+      double docScore = 0;
 
       for (int i = 0; i < daatPtrs.size(); ++i) {
         DaaTPtr dp = daatPtrs.get(i);
 
         // compare doc id and do records
-        int currDocId = dp.scoreList.getDocid(dp.nextDoc);
+        int currDocId = dp.nextDoc >= dp.scoreList.scores.size() ?
+                0 : dp.scoreList.getDocid(dp.nextDoc);
         if (currDocId != minDocId) {
-          termScore = ((QryopSl)args.get(i)).getDefaultScore(r, minDocId);
+          docScore += ((QryopSl) args.get(i)).getDefaultScore(r, minDocId);
         } else {
-          termScore += dp.scoreList.getDocidScore(dp.nextDoc++);
+          docScore += dp.scoreList.getDocidScore(dp.nextDoc++);
         }
       }
-      // normalize termScore with query term number
-      result.docScores.add(minDocId, termScore / daatPtrs.size());
-    } while (minDocId != Integer.MAX_VALUE);
+      // normalize docScore with query term number
+      result.docScores.add(minDocId, docScore / daatPtrs.size());
+    }
     freeDaaTPtrs();
 
     return result;
@@ -240,10 +239,11 @@ public class QryopSlAnd extends QryopSl {
 
     for (DaaTPtr ptri : this.daatPtrs) {
       // already gone through
-      if (ptri.nextDoc >= ptri.scoreList.scores.size())
+      if (ptri.nextDoc >= ptri.scoreList.scores.size()) {
         continue;
+      }
 
-      int docid = ptri.invList.getDocid(ptri.nextDoc);
+      int docid = ptri.scoreList.getDocid(ptri.nextDoc);
       if (nextDocid > docid) {
         nextDocid = docid;
       }

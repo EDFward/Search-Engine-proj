@@ -9,6 +9,17 @@ import java.util.List;
  * @author junjiah
  */
 public class QryopSlSum extends QryopSl {
+  /**
+   * Constructs QryopSlSum with specified query operators
+   *
+   * @param q
+   */
+  public QryopSlSum(Qryop... q) {
+    for (int i = 0; i < q.length; i++) {
+      this.args.add(q[i]);
+    }
+  }
+
   @Override
   public double getDefaultScore(RetrievalModel r, long docid) throws IOException {
     return 0;
@@ -36,17 +47,16 @@ public class QryopSlSum extends QryopSl {
   @Override
   public QryResult evaluate(RetrievalModel r) throws IOException {
     if (!(r instanceof RetrievalModelBM25)) {
-      System.err.println("Error: #SUM only supports BM25 model");
-      System.exit(-1);
+      QryEval.fatalError("Error: #SUM only supports BM25 model");
     }
 
     allocDaaTPtrs(r);
     QryResult result = new QryResult();
+    double k_3 = ((RetrievalModelBM25) r).getK_3();
 
     // iterate all daat ptrs and find the smallest docid,
     // and record scores accordingly
-    while (this.daatPtrs.size() > 0)
-    {
+    while (this.daatPtrs.size() > 0) {
       // record daat ptrs with min docid; advance their nextdoc later
       List<DaaTPtr> minDaatPtr = new ArrayList<DaaTPtr>();
       int minDocId = Integer.MAX_VALUE;
@@ -55,11 +65,15 @@ public class QryopSlSum extends QryopSl {
       Iterator<DaaTPtr> iter = this.daatPtrs.iterator();
       while (iter.hasNext()) {
         DaaTPtr dp = iter.next();
+
         // remove this daat ptr if all docs have been traversed
         if (dp.nextDoc >= dp.scoreList.scores.size()) {
           iter.remove();
           continue;
         }
+        // qtf is 1
+        double qtf = 1;
+        double userWeight = (k_3 + 1) * qtf / (k_3 + qtf);
 
         // compare doc id and do records
         int currDocId = dp.scoreList.getDocid(dp.nextDoc);
@@ -67,26 +81,29 @@ public class QryopSlSum extends QryopSl {
           minDocId = currDocId;
           minDaatPtr.clear();
           minDaatPtr.add(dp);
-          termScore = dp.scoreList.getDocidScore(dp.nextDoc);
+          termScore = dp.scoreList.getDocidScore(dp.nextDoc) * userWeight;
         } else if (currDocId == minDocId) {
           minDaatPtr.add(dp);
-          termScore += dp.scoreList.getDocidScore(dp.nextDoc);
+          termScore += dp.scoreList.getDocidScore(dp.nextDoc) * userWeight;
         }
       }
       // ignore if no more daatPtr
-      if (minDocId != Integer.MAX_VALUE)
+      if (minDocId != Integer.MAX_VALUE) {
         result.docScores.add(minDocId, termScore);
+      }
       // advance minDaatPtr's nextdoc since their doc have been processed
-      for (DaaTPtr dp : minDaatPtr)
+      for (DaaTPtr dp : minDaatPtr) {
         dp.nextDoc++;
+      }
     }
     freeDaaTPtrs();
     return result;
   }
 
   /**
-   *  Return a string version of this query operator.
-   *  @return The string version of this query operator.
+   * Return a string version of this query operator.
+   *
+   * @return The string version of this query operator.
    */
   @Override
   public String toString() {
