@@ -92,6 +92,9 @@ public class QryopIlNear extends QryopIl {
         }
         // all docIds have positions matching the requirement, record the pos
         positions.add(ptr0Pos);
+        // advance position pointers in other daat ptr
+        for (int j = 1; j < daatPtrPos.length; ++j)
+          ++daatPtrPos[j];
       }
       if (!positions.isEmpty()) {
         result.invertedList.appendPosting(ptr0Docid, positions);
