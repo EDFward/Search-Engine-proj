@@ -24,7 +24,7 @@ public class QryopSlAnd extends QryopSl {
    * Appends an argument to the list of query operator arguments.  This
    * simplifies the design of some query parsing architectures.
    *
-   * @param a q The query argument (query operator) to append.
+   * @param a The query argument (query operator) to append.
    * @return void
    */
   public void add(Qryop a) {

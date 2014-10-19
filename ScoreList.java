@@ -112,8 +112,7 @@ public class ScoreList {
       // update the scores to keep only 100 entries
       scores.clear();
       scores.addAll(Arrays.asList(heap));
-    }
-    else {
+    } else {
       // otherwise store the external ID and then directly sort
       for (ScoreListEntry entry : scores) {
         externalIds.put(entry, QryEval.getExternalDocid(entry.docid));

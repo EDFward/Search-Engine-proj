@@ -2,16 +2,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class QryopSlWeightedAnd extends QryopSlAnd {
+public class QryopSlWeightedSum extends QryopSlAnd {
 
-  public QryopSlWeightedAnd() {
+  public QryopSlWeightedSum() {
     this.weights = new ArrayList<Double>();
   }
 
   /**
    * Appends an argument to the list of query operator arguments along with its weight.
    *
-   * @param a      The query argument (query operator) to append.
+   * @param a      q The query argument (query operator) to append.
    * @param weight The weight of the query argument.
    * @return void
    */
@@ -37,7 +37,7 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
         Qryop arg = this.args.get(i);
         // they must be QryopSl, so downcast.
         // since they are in log scale, sum them up with corresponding weights
-        defaultScore += ((QryopSl) arg).getDefaultScore(r, docid) * weights.get(i);
+        defaultScore += Math.exp(((QryopSl) arg).getDefaultScore(r, docid)) * weights.get(i);
       }
 
       // normalize score with total weights
@@ -46,10 +46,10 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
         totalWeights += w;
       }
 
-      return defaultScore / totalWeights;
+      return Math.log(defaultScore / totalWeights);
     }
 
-    System.err.println("Warning: WAND only supports Indri.");
+    System.err.println("Warning: WSUM only supports Indri.");
     return 0.0;
   }
 
@@ -67,7 +67,7 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
     QryResult result = new QryResult();
 
     if (!(r instanceof RetrievalModelIndri)) {
-      QryEval.fatalError("Error: WAND Only supports Indri.");
+      QryEval.fatalError("Error: WSUM Only supports Indri.");
     }
 
     int minDocId;
@@ -79,13 +79,15 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
       for (int i = 0; i < daatPtrs.size(); ++i) {
         DaaTPtr dp = daatPtrs.get(i);
 
-        // compare doc id and add scores with corresponding weights
+        // compare doc id and add scores with corresponding weights,
+        // first exp then sum, and finally log
         int currDocId = dp.nextDoc >= dp.scoreList.scores.size() ?
                 0 : dp.scoreList.getDocid(dp.nextDoc);
         if (currDocId != minDocId) {
-          docScore += ((QryopSl) args.get(i)).getDefaultScore(r, minDocId) * weights.get(i);
+          docScore +=
+                  Math.exp(((QryopSl) args.get(i)).getDefaultScore(r, minDocId)) * weights.get(i);
         } else {
-          docScore += dp.scoreList.getDocidScore(dp.nextDoc++) * weights.get(i);
+          docScore += Math.exp(dp.scoreList.getDocidScore(dp.nextDoc++)) * weights.get(i);
         }
       }
       // normalize docScore with total weights
@@ -93,8 +95,8 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
       for (double w : weights) {
         totalWeights += w;
       }
-
-      result.docScores.add(minDocId, docScore / totalWeights);
+      // back to logarithm
+      result.docScores.add(minDocId, Math.log(docScore / totalWeights));
     }
     freeDaaTPtrs();
 
@@ -109,7 +111,7 @@ public class QryopSlWeightedAnd extends QryopSlAnd {
       result += arg.toString() + " ";
     }
 
-    return ("#WAND( " + result + ")");
+    return ("#WSUM( " + result + ")");
   }
 
   /**

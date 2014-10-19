@@ -73,8 +73,9 @@ public class QryopIlWindow extends QryopIl {
           Vector<Integer> postings = dp.invList.postings.get(dp.nextDoc).positions;
           // check if already iterated through this posting,
           // if yes, this doc is done, break
-          if (daatPtrPos[i] >= postings.size())
+          if (daatPtrPos[i] >= postings.size()) {
             break LOOP_FOR_WINDOW;
+          }
           // otherwise, update min/max term location
           int loc = postings.get(daatPtrPos[i]);
           if (loc < minLoc) {
@@ -90,8 +91,7 @@ public class QryopIlWindow extends QryopIl {
         if (windowSize > distance) {
           // not good, only advance loc pointer of smallest one
           ++daatPtrPos[minLocDaaTIndex];
-        }
-        else {
+        } else {
           // record maxLoc
           positions.add(maxLoc);
           // advance location pointer for all
