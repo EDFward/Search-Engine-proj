@@ -160,7 +160,7 @@ public class QryEval {
       }
     } catch (Exception e) {
       e.printStackTrace();
-      fatalError("Error: evaluation failed.");
+      fatalError("Error: Evaluation failed.");
     } finally {
       try {
         assert writer != null;

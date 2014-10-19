@@ -233,7 +233,7 @@ public class QryopSlAnd extends QryopSl {
    * @return The smallest internal document id. Return MAX_VALUE
    * if all DaaT pointers have been traversed.
    */
-  private int getSmallestCurrentDocid() {
+  protected int getSmallestCurrentDocid() {
 
     int nextDocid = Integer.MAX_VALUE;
 
