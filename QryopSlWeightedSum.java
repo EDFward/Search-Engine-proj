@@ -2,22 +2,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class QryopSlWeightedSum extends QryopSlAnd {
+public class QryopSlWeightedSum extends QryopSlWeighted {
 
   public QryopSlWeightedSum() {
-    this.weights = new ArrayList<Double>();
-  }
-
-  /**
-   * Appends an argument to the list of query operator arguments along with its weight.
-   *
-   * @param a      q The query argument (query operator) to append.
-   * @param weight The weight of the query argument.
-   * @return void
-   */
-  public void add(Qryop a, double weight) {
-    this.args.add(a);
-    this.weights.add(weight);
+    super();
   }
 
   /**
@@ -113,9 +101,4 @@ public class QryopSlWeightedSum extends QryopSlAnd {
 
     return ("#WSUM( " + result + ")");
   }
-
-  /**
-   * Weights of the query arguments.
-   */
-  private final List<Double> weights;
 }

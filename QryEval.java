@@ -270,6 +270,12 @@ public class QryEval {
       } else if (token.equalsIgnoreCase("#sum")) {
         currentOp = new QryopSlSum();
         stack.push(currentOp);
+      } else if (token.equalsIgnoreCase("#wand")) {
+        currentOp = new QryopSlWeightedAnd();
+        stack.push(currentOp);
+      } else if (token.equalsIgnoreCase("#wsum")) {
+        currentOp = new QryopSlWeightedSum();
+        stack.push(currentOp);
       } else if (token.toLowerCase().startsWith("#near")) {
         try {
           int nearArg = Integer.parseInt(token.split("/")[1]);
@@ -277,7 +283,16 @@ public class QryEval {
           stack.push(currentOp);
         } catch (NumberFormatException e) {
           e.printStackTrace();
-          fatalError("Error: wrong format for NEAR argument.");
+          fatalError("Error: Wrong format for NEAR argument.");
+        }
+      } else if (token.toLowerCase().startsWith("#window")) {
+        try {
+          int windowArg = Integer.parseInt(token.split("/")[1]);
+          currentOp = new QryopIlWindow(windowArg);
+          stack.push(currentOp);
+        } catch (NumberFormatException e) {
+          e.printStackTrace();
+          fatalError("Error: Wrong format for WINDOW argument.");
         }
       } else if (token.startsWith(")")) {
         /*
@@ -297,6 +312,15 @@ public class QryEval {
         currentOp = stack.peek();
         currentOp.add(arg);
       } else {
+        // check if current query operator needs to accept weights,
+        // otherwise parse the token normally
+        if (currentOp instanceof QryopSlWeighted &&
+                ((QryopSlWeighted)currentOp).isAcceptWeight()) {
+          double weight = Double.parseDouble(token);
+          ((QryopSlWeighted)currentOp).add(weight);
+          continue;
+        }
+
         String tokenField = "body";
         if (token.contains(".")) { // if token contains field info
           String[] parts = token.split("\\.", 2);
@@ -308,6 +332,10 @@ public class QryEval {
         if (tokenizeResult.length != 0) {
           assert currentOp != null;
           currentOp.add(new QryopIlTerm(tokenizeResult[0], tokenField));
+        } else {
+          // discard the corresponding weight for term if currentOp is QryopSlWeighted
+          if (currentOp instanceof QryopSlWeighted)
+            ((QryopSlWeighted)currentOp).discardLastWeight();
         }
       }
     }
