@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,7 +12,7 @@ public class QryopSlWeighted extends QryopSlAnd {
   /**
    * Appends an argument to the list of query operator arguments.
    *
-   * @param a      The query argument (query operator) to append.
+   * @param a The query argument (query operator) to append.
    * @return void
    */
   public void add(Qryop a) {
@@ -36,6 +35,7 @@ public class QryopSlWeighted extends QryopSlAnd {
 
   /**
    * Get the indicator for accepting arguments.
+   *
    * @return
    */
   public boolean isAcceptWeight() {

@@ -315,9 +315,9 @@ public class QryEval {
         // check if current query operator needs to accept weights,
         // otherwise parse the token normally
         if (currentOp instanceof QryopSlWeighted &&
-                ((QryopSlWeighted)currentOp).isAcceptWeight()) {
+                ((QryopSlWeighted) currentOp).isAcceptWeight()) {
           double weight = Double.parseDouble(token);
-          ((QryopSlWeighted)currentOp).add(weight);
+          ((QryopSlWeighted) currentOp).add(weight);
           continue;
         }
 
@@ -334,8 +334,9 @@ public class QryEval {
           currentOp.add(new QryopIlTerm(tokenizeResult[0], tokenField));
         } else {
           // discard the corresponding weight for term if currentOp is QryopSlWeighted
-          if (currentOp instanceof QryopSlWeighted)
-            ((QryopSlWeighted)currentOp).discardLastWeight();
+          if (currentOp instanceof QryopSlWeighted) {
+            ((QryopSlWeighted) currentOp).discardLastWeight();
+          }
         }
       }
     }
