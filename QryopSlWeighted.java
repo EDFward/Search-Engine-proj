@@ -47,6 +47,8 @@ public class QryopSlWeighted extends QryopSlAnd {
    */
   public void discardLastWeight() {
     this.weights.remove(this.weights.size() - 1);
+    // meanwhile flip the accepting flag
+    acceptWeight = true;
   }
 
   /**
