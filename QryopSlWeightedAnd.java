@@ -32,7 +32,11 @@ public class QryopSlWeightedAnd extends QryopSlWeighted {
         totalWeights += w;
       }
 
-      return defaultScore / totalWeights;
+      if (totalWeights != 0) {
+        return defaultScore / totalWeights;
+      } else {
+        return 0.0;
+      }
     }
 
     System.err.println("Warning: WAND only supports Indri.");
@@ -80,7 +84,9 @@ public class QryopSlWeightedAnd extends QryopSlWeighted {
         totalWeights += w;
       }
 
-      result.docScores.add(minDocId, docScore / totalWeights);
+      if (totalWeights != 0) {
+        result.docScores.add(minDocId, docScore / totalWeights);
+      }
     }
     freeDaaTPtrs();
 

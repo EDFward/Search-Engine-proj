@@ -31,8 +31,11 @@ public class QryopSlWeightedSum extends QryopSlWeighted {
       for (double w : weights) {
         totalWeights += w;
       }
-
-      return Math.log(defaultScore / totalWeights);
+      if (totalWeights != 0) {
+        return Math.log(defaultScore / totalWeights);
+      } else {
+        return 0;
+      }
     }
 
     System.err.println("Warning: WSUM only supports Indri.");
@@ -81,8 +84,11 @@ public class QryopSlWeightedSum extends QryopSlWeighted {
       for (double w : weights) {
         totalWeights += w;
       }
-      // back to logarithm
-      result.docScores.add(minDocId, Math.log(docScore / totalWeights));
+      // skip if total weight is zero
+      if (totalWeights != 0) {
+        // back to logarithm
+        result.docScores.add(minDocId, Math.log(docScore / totalWeights));
+      }
     }
     freeDaaTPtrs();
 
