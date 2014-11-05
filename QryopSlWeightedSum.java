@@ -98,11 +98,9 @@ public class QryopSlWeightedSum extends QryopSlWeighted {
   @Override
   public String toString() {
     String result = "";
-
-    for (Qryop arg : this.args) {
-      result += arg.toString() + " ";
+    for (int i = 0; i < args.size(); ++i) {
+      result += String.format("%.4f %s ", weights.get(i), args.get(i));
     }
-
     return ("#WSUM( " + result + ")");
   }
 }

@@ -67,6 +67,10 @@ public class QryopIlTerm extends QryopIl {
    *  @return The string version of this query operator.
    */
   public String toString() {
-    return (this.term + "." + this.field);
+    if (field.equalsIgnoreCase("body")) {
+      return term;
+    } else {
+      return (term + "." + field);
+    }
   }
 }

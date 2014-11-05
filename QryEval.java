@@ -43,14 +43,14 @@ public class QryEval {
   //  Create and configure an English analyzer that will be used for
   //  query parsing.
 
+  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
+          + " paramFile\n\n";
+
   static {
     analyzer.setLowercase(true);
     analyzer.setStopwordRemoval(true);
     analyzer.setStemmer(EnglishAnalyzerConfigurable.StemmerType.KSTEM);
   }
-
-  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
-          + " paramFile\n\n";
 
   /**
    * @param args The only argument is the path to the parameter file.
@@ -127,9 +127,14 @@ public class QryEval {
     }
 
     // evaluate and create the trec_eval output.
-    BufferedWriter writer = null;
+    BufferedWriter rankWriter = null, queryWriter = null;
+    boolean fb = params.containsKey("fb") && (params.get("fb").equalsIgnoreCase("true"));
+    if (fb) {
+      queryWriter = new BufferedWriter(
+              new FileWriter(new File(params.get("fbExpansionQueryFile"))));
+    }
     try {
-      writer = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
+      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
       // add default query operator depending on retrieval model
       // and set parameters accordingly
       Qryop defaultQryop;
@@ -148,6 +153,7 @@ public class QryEval {
       }
 
       for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
+        int queryId = entry.getKey();
         defaultQryop.clear();
         // parse the query, then evaluate
         Qryop parsedQuery = parseQuery(entry.getValue(), defaultQryop);
@@ -158,7 +164,7 @@ public class QryEval {
         /**
          * If relevance feedback is specified, re-evaluate the query
          */
-        if (params.containsKey("fb") && (params.get("fb").equalsIgnoreCase("true"))) {
+        if (fb) {
           Qryop expandedQuery;
           int fbDocs = 0;
           int fbTerms = 0;
@@ -179,6 +185,11 @@ public class QryEval {
           } else {
             expandedQuery = expandQuery(result, fbDocs, fbTerms, fbMu);
           }
+
+          if (queryWriter != null) {
+            queryWriter.write(queryId + ": " + expandedQuery + "\n");
+          }
+
           QryopSlWeightedAnd combinedQuery = new QryopSlWeightedAnd();
           combinedQuery.add(fbOrigWeight);
           combinedQuery.add(parsedQuery);
@@ -189,9 +200,8 @@ public class QryEval {
         }
 
         // write to evaluation file
-        int queryId = entry.getKey();
         if (result.docScores.scores.size() < 1) {
-          writer.write(queryId + " Q0 dummy 1 0 run-1\n");
+          rankWriter.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
           for (int j = 0; j < result.docScores.scores.size(); ++j) {
             String s = String.format("%d Q0 %s %d %.10f run-1\n",
@@ -199,7 +209,7 @@ public class QryEval {
                     getExternalDocid(result.docScores.getDocid(j)), // external id
                     j + 1,                                          // rank
                     result.docScores.getDocidScore(j));
-            writer.write(s);
+            rankWriter.write(s);
           }
         }
       }
@@ -207,10 +217,11 @@ public class QryEval {
       e.printStackTrace();
       fatalError("Error: Evaluation failed.");
     } finally {
-      try {
-        assert writer != null;
-        writer.close();
-      } catch (Exception ignored) {
+      if (rankWriter != null) {
+        rankWriter.close();
+      }
+      if (queryWriter != null) {
+        queryWriter.close();
       }
     }
 
@@ -227,7 +238,7 @@ public class QryEval {
    * @param fbDocs          Number of feedback documents
    * @param fbTerms         Number of feedback terms
    * @param fbMu            Parameter mu for p(t|d)
-   * @return
+   * @return Expaneded query from previously evaluated query result
    */
   private static Qryop expandQuery(QryResult evaluatedResult, int fbDocs, int fbTerms, int fbMu)
           throws IOException {
@@ -250,14 +261,14 @@ public class QryEval {
       termVectorList.add(termVector);
 
       // add term term string to score map, and record MLE of p(t|c)
-      for (int j = 0; j < termVector.stemsLength(); ++j) {
+      for (int j = 1; j < termVector.stemsLength(); ++j) {
         String termString = termVector.stemString(j);
         // ignore terms with comma and period
         if (termString.contains(",") || termString.contains(".")) {
           continue;
         }
         termScore.put(termString, 0d);
-        ctfProb.put(termString, ((double) termVector.totalStemFreq(i)) / fieldLength);
+        ctfProb.put(termString, ((double) termVector.totalStemFreq(j)) / fieldLength);
       }
     }
 
@@ -310,7 +321,7 @@ public class QryEval {
       termVectorList.add(termVector);
 
       // add term term string to score map, and record MLE of p(t|c)
-      for (int i = 0; i < termVector.stemsLength(); ++i) {
+      for (int i = 1; i < termVector.stemsLength(); ++i) {
         String termString = termVector.stemString(i);
         // ignore terms with comma and period
         if (termString.contains(",") || termString.contains(".")) {
@@ -328,13 +339,14 @@ public class QryEval {
 
   /**
    * Build weighted AND query operator for query expansion from acquired information.
-   * @param fbTerms Number of feedback terms
-   * @param fbMu Parameter mu for p(t|d)
-   * @param termScore A map of scores for every term
-   * @param ctfProb A map of p(t|c) for every term
+   *
+   * @param fbTerms        Number of feedback terms
+   * @param fbMu           Parameter mu for p(t|d)
+   * @param termScore      A map of scores for every term
+   * @param ctfProb        A map of p(t|c) for every term
    * @param termVectorList A list of term vectors
-   * @param scoreList A list of document scores
-   * @param lengthList A list of document length
+   * @param scoreList      A list of document scores
+   * @param lengthList     A list of document length
    * @return The final weighted AND query operator
    */
   private static Qryop buildExpandedQuery(int fbTerms, int fbMu, Map<String, Double> termScore,
@@ -344,7 +356,7 @@ public class QryEval {
       TermVector termVector = termVectorList.get(i);
       // read term freq for this particular document
       Map<String, Integer> termFreq = new HashMap<String, Integer>();
-      for (int j = 0; j < termVector.stemsLength(); ++j) {
+      for (int j = 1; j < termVector.stemsLength(); ++j) {
         termFreq.put(termVector.stemString(j), termVector.stemFreq(j));
       }
       long length = lengthList.get(i);
