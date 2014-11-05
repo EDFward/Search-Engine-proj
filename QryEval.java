@@ -25,21 +25,23 @@ import java.util.*;
 
 public class QryEval {
 
-  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
-          + " paramFile\n\n";
+  /**
+   * Document length reader.
+   */
+  public static DocLengthStore LENGTH_STORE;
+
+  public static IndexReader READER;
 
   //  The index file reader is accessible via a global variable. This
   //  isn't great programming style, but the alternative is for every
   //  query operator to store or pass this value, which creates its
   //  own headaches.
 
-  public static IndexReader READER;
+  public static EnglishAnalyzerConfigurable analyzer =
+          new EnglishAnalyzerConfigurable(Version.LUCENE_43);
 
   //  Create and configure an English analyzer that will be used for
   //  query parsing.
-
-  public static EnglishAnalyzerConfigurable analyzer =
-          new EnglishAnalyzerConfigurable(Version.LUCENE_43);
 
   static {
     analyzer.setLowercase(true);
@@ -47,11 +49,14 @@ public class QryEval {
     analyzer.setStemmer(EnglishAnalyzerConfigurable.StemmerType.KSTEM);
   }
 
+  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
+          + " paramFile\n\n";
+
   /**
    * @param args The only argument is the path to the parameter file.
    * @throws Exception
    */
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) throws Exception { // TODO: simplify main function
     // when everything begins
     final long startTime = System.currentTimeMillis();
 
@@ -77,8 +82,13 @@ public class QryEval {
       fatalError("Error: Parameter 'indexPath' was missing.");
     }
 
-    // open the index
+    // open the index and LENGTH_STORE
     READER = DirectoryReader.open(FSDirectory.open(new File(params.get("indexPath"))));
+    try {
+      LENGTH_STORE = new DocLengthStore(QryEval.READER);
+    } catch (IOException e) {
+      fatalError("Error: DocLengthStore initialization error");
+    }
 
     if (READER == null) {
       fatalError(usage);
@@ -140,17 +150,52 @@ public class QryEval {
       for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
         defaultQryop.clear();
         // parse the query, then evaluate
-        QryResult result = parseQuery(entry.getValue(), defaultQryop).evaluate(model);
+        Qryop parsedQuery = parseQuery(entry.getValue(), defaultQryop);
+        QryResult result = parsedQuery.evaluate(model);
         // sort and truncate to 100 if necessary
         result.docScores.sortAndTruncate();
-        int queryId = entry.getKey();
+
+        /**
+         * If relevance feedback is specified, re-evaluate the query
+         */
+        if (params.containsKey("fb") && (params.get("fb").equalsIgnoreCase("true"))) {
+          Qryop expandedQuery;
+          int fbDocs = 0;
+          int fbTerms = 0;
+          int fbMu = 0;
+          double fbOrigWeight = 0;
+          try {
+            fbDocs = Integer.parseInt(params.get("fbDocs"));
+            fbTerms = Integer.parseInt(params.get("fbTerms"));
+            fbMu = Integer.parseInt(params.get("fbMu"));
+            fbOrigWeight = Double.parseDouble(params.get("fbOrigWeight"));
+          } catch (Exception e) {
+            e.printStackTrace();
+            fatalError("ERROR: Parsing FB parameters error!");
+          }
+          if (params.containsKey("fbInitialRankingFile")) {
+            String fbInitialRankingFile = params.get("fbInitialRankingFile");
+            expandedQuery = expandQuery(fbInitialRankingFile, fbDocs, fbTerms, fbMu);
+          } else {
+            expandedQuery = expandQuery(result, fbDocs, fbTerms, fbMu);
+          }
+          QryopSlWeightedAnd combinedQuery = new QryopSlWeightedAnd();
+          combinedQuery.add(fbOrigWeight);
+          combinedQuery.add(parsedQuery);
+          combinedQuery.add(1 - fbOrigWeight);
+          combinedQuery.add(expandedQuery);
+          result = combinedQuery.evaluate(model);
+          result.docScores.sortAndTruncate();
+        }
+
         // write to evaluation file
+        int queryId = entry.getKey();
         if (result.docScores.scores.size() < 1) {
           writer.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
           for (int j = 0; j < result.docScores.scores.size(); ++j) {
             String s = String.format("%d Q0 %s %d %.10f run-1\n",
-                    queryId,                                              // query id
+                    queryId,                                        // query id
                     getExternalDocid(result.docScores.getDocid(j)), // external id
                     j + 1,                                          // rank
                     result.docScores.getDocidScore(j));
@@ -173,6 +218,171 @@ public class QryEval {
     final long endTime = System.currentTimeMillis();
     System.out.println("Total evaluation time: " + (endTime - startTime) / 1000.0 + " seconds");
     printMemoryUsage(false);
+  }
+
+  /**
+   * Expand query from already evaluated query results.
+   *
+   * @param evaluatedResult Already evaluated result
+   * @param fbDocs          Number of feedback documents
+   * @param fbTerms         Number of feedback terms
+   * @param fbMu            Parameter mu for p(t|d)
+   * @return
+   */
+  private static Qryop expandQuery(QryResult evaluatedResult, int fbDocs, int fbTerms, int fbMu)
+          throws IOException {
+    Map<String, Double> termScore = new HashMap<String, Double>();
+    Map<String, Double> ctfProb = new HashMap<String, Double>();
+    List<TermVector> termVectorList = new ArrayList<TermVector>(fbDocs);
+    List<Double> scoreList = new ArrayList<Double>(fbDocs);
+    List<Long> lengthList = new ArrayList<Long>(fbDocs);
+    long fieldLength = READER.getSumTotalTermFreq("body");
+
+    for (int i = 0; i < fbDocs && i < evaluatedResult.docScores.scores.size(); ++i) {
+      int internalId = evaluatedResult.docScores.getDocid(i);
+      // my score is in log space
+      Double score = Math.exp(evaluatedResult.docScores.getDocidScore(i));
+
+      // record length, score and term vector separately
+      lengthList.add(LENGTH_STORE.getDocLength("body", internalId));
+      scoreList.add(score);
+      TermVector termVector = new TermVector(internalId, "body");
+      termVectorList.add(termVector);
+
+      // add term term string to score map, and record MLE of p(t|c)
+      for (int j = 0; j < termVector.stemsLength(); ++j) {
+        String termString = termVector.stemString(j);
+        // ignore terms with comma and period
+        if (termString.contains(",") || termString.contains(".")) {
+          continue;
+        }
+        termScore.put(termString, 0d);
+        ctfProb.put(termString, ((double) termVector.totalStemFreq(i)) / fieldLength);
+      }
+    }
+
+    return buildExpandedQuery(fbTerms, fbMu, termScore, ctfProb, termVectorList, scoreList,
+            lengthList);
+  }
+
+  /**
+   * Expand query from a ranking file.
+   *
+   * @param fbInitialRankingFile Randing file
+   * @param fbDocs               Number of feedback documents
+   * @param fbTerms              Number of feedback terms
+   * @param fbMu                 Parameter mu for p(t|d)
+   * @return Expanded query based on ranking file
+   * @throws IOException
+   */
+  private static Qryop expandQuery(String fbInitialRankingFile, int fbDocs, int fbTerms,
+          int fbMu)
+          throws Exception {
+    BufferedReader rankFileReader;
+    String line;
+    rankFileReader = new BufferedReader(new FileReader(fbInitialRankingFile));
+
+    Map<String, Double> termScore = new HashMap<String, Double>();
+    Map<String, Double> ctfProb = new HashMap<String, Double>();
+    List<TermVector> termVectorList = new ArrayList<TermVector>(fbDocs);
+    List<Double> scoreList = new ArrayList<Double>(fbDocs);
+    List<Long> lengthList = new ArrayList<Long>(fbDocs);
+    long fieldLength = READER.getSumTotalTermFreq("body");
+    int lineCount = 0;
+
+    while ((lineCount++ < fbDocs) && ((line = rankFileReader.readLine()) != null)) {
+      line = line.trim();
+      if (line.isEmpty()) {
+        break;
+      }
+      String[] parts = line.split("\\s+");
+      String externalId = parts[2];
+      int internalId = getInternalDocid(externalId);
+      Double score = Double.parseDouble(parts[4]);
+      if (score < 0) { // normalize score if in log space
+        score = Math.exp(score);
+      }
+
+      // record length, score and term vector separately
+      lengthList.add(LENGTH_STORE.getDocLength("body", internalId));
+      scoreList.add(score);
+      TermVector termVector = new TermVector(internalId, "body");
+      termVectorList.add(termVector);
+
+      // add term term string to score map, and record MLE of p(t|c)
+      for (int i = 0; i < termVector.stemsLength(); ++i) {
+        String termString = termVector.stemString(i);
+        // ignore terms with comma and period
+        if (termString.contains(",") || termString.contains(".")) {
+          continue;
+        }
+        termScore.put(termString, 0d);
+        ctfProb.put(termString, ((double) termVector.totalStemFreq(i)) / fieldLength);
+      }
+    }
+    rankFileReader.close();
+
+    return buildExpandedQuery(fbTerms, fbMu, termScore, ctfProb, termVectorList, scoreList,
+            lengthList);
+  }
+
+  /**
+   * Build weighted AND query operator for query expansion from acquired information.
+   * @param fbTerms Number of feedback terms
+   * @param fbMu Parameter mu for p(t|d)
+   * @param termScore A map of scores for every term
+   * @param ctfProb A map of p(t|c) for every term
+   * @param termVectorList A list of term vectors
+   * @param scoreList A list of document scores
+   * @param lengthList A list of document length
+   * @return The final weighted AND query operator
+   */
+  private static Qryop buildExpandedQuery(int fbTerms, int fbMu, Map<String, Double> termScore,
+          Map<String, Double> ctfProb, List<TermVector> termVectorList, List<Double> scoreList,
+          List<Long> lengthList) {
+    for (int i = 0; i < termVectorList.size(); ++i) {
+      TermVector termVector = termVectorList.get(i);
+      // read term freq for this particular document
+      Map<String, Integer> termFreq = new HashMap<String, Integer>();
+      for (int j = 0; j < termVector.stemsLength(); ++j) {
+        termFreq.put(termVector.stemString(j), termVector.stemFreq(j));
+      }
+      long length = lengthList.get(i);
+      double score = scoreList.get(i);
+
+      // update score p(t|I) for each term, even if it's not present in one document
+      for (String term : termScore.keySet()) {
+        double currentScore = termScore.get(term);
+        int tf = 0;
+        if (termFreq.containsKey(term)) {
+          tf = termFreq.get(term);
+        }
+        double tGivenC = ctfProb.get(term);
+        currentScore += (tf + fbMu * tGivenC) / (length + fbMu) * score * Math.log(1 / tGivenC);
+        termScore.put(term, currentScore);
+      }
+    }
+
+    // sort termScore by their score
+    List<Map.Entry<String, Double>> sortedTermScore = new ArrayList<Map.Entry<String, Double>>(
+            termScore.entrySet());
+    Collections.sort(sortedTermScore, new Comparator<Map.Entry<String, Double>>() {
+      @Override
+      public int compare(Map.Entry<String, Double> e1, Map.Entry<String, Double> e2) {
+        // we need descending order
+        return e2.getValue().compareTo(e1.getValue());
+      }
+    });
+
+    // build the final query!
+    QryopSlWeightedAnd expandedQuery = new QryopSlWeightedAnd();
+    int termLimit = Math.min(fbTerms, sortedTermScore.size());
+    for (int i = 0; i < termLimit; ++i) {
+      Map.Entry<String, Double> entry = sortedTermScore.get(i);
+      expandedQuery.add(entry.getValue());
+      expandedQuery.add(new QryopIlTerm(entry.getKey(), "body"));
+    }
+    return expandedQuery;
   }
 
   /**

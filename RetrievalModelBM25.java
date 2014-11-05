@@ -8,6 +8,26 @@ import java.io.IOException;
 public class RetrievalModelBM25 extends RetrievalModel {
 
   /**
+   * Parameter K1 in BM25 retrieval model.
+   */
+  private double k_1;
+
+  /**
+   * Parameter K3 in BM25 retrieval model.
+   */
+  private double k_3;
+
+  /**
+   * Parameter b in BM25 retrieval model.
+   */
+  private double b;
+
+  /**
+   * Document length reader.
+   */
+  private DocLengthStore docLengthStore;
+
+  /**
    * Initialize the document length reader for future evaluation.
    */
   public RetrievalModelBM25() {
@@ -93,24 +113,4 @@ public class RetrievalModelBM25 extends RetrievalModel {
   public DocLengthStore getDocLengthStore() {
     return docLengthStore;
   }
-
-  /**
-   * Parameter K1 in BM25 retrieval model.
-   */
-  private double k_1;
-
-  /**
-   * Parameter K3 in BM25 retrieval model.
-   */
-  private double k_3;
-
-  /**
-   * Parameter b in BM25 retrieval model.
-   */
-  private double b;
-
-  /**
-   * Document length reader.
-   */
-  private DocLengthStore docLengthStore;
 }

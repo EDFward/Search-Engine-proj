@@ -21,34 +21,9 @@ public class InvList {
 
   //  Utility class that makes it easier to construct postings.
 
-  public class DocPosting {
-
-    public int docid = 0;
-
-    public int tf = 0;
-
-    public Vector<Integer> positions = new Vector<Integer>();
-
-    public DocPosting(int d, int... locations) {
-      this.docid = d;
-      this.tf = locations.length;
-      for (int location : locations) {
-        this.positions.add(location);
-      }
-    }
-
-    public DocPosting(int d, List<Integer> locations) {
-      this.docid = d;
-      this.tf = locations.size();
-      for (Integer location : locations) {
-        this.positions.add(location);
-      }
-    }
-  }
+  public int ctf = 0;
 
   //  Class variables.
-
-  public int ctf = 0;
 
   public int df = 0;
 
@@ -180,6 +155,31 @@ public class InvList {
       }
 
       System.out.println();
+    }
+  }
+
+  public class DocPosting {
+
+    public int docid = 0;
+
+    public int tf = 0;
+
+    public Vector<Integer> positions = new Vector<Integer>();
+
+    public DocPosting(int d, int... locations) {
+      this.docid = d;
+      this.tf = locations.length;
+      for (int location : locations) {
+        this.positions.add(location);
+      }
+    }
+
+    public DocPosting(int d, List<Integer> locations) {
+      this.docid = d;
+      this.tf = locations.size();
+      for (Integer location : locations) {
+        this.positions.add(location);
+      }
     }
   }
 }

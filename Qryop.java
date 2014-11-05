@@ -18,20 +18,12 @@ public abstract class Qryop {
   //  DaaTPtrs are used by query operators for Document-at-a-Time (DAAT)
   //  query evaluation
 
-  protected class DaaTPtr {
-    protected ScoreList scoreList;  // A qry arg's score list (if any)
-
-    protected InvList invList;    // A qry arg's inverted list (if any)
-
-    protected int nextDoc;    // The next document to examine
-  }
+  protected ArrayList<Qryop> args = new ArrayList<Qryop>();
 
   ;
 
   //  Initially the query operator starts with no arguments and no
   //  DaaTPtrs.
-
-  protected ArrayList<Qryop> args = new ArrayList<Qryop>();
 
   protected List<DaaTPtr> daatPtrs = new ArrayList<DaaTPtr>();
 
@@ -97,4 +89,12 @@ public abstract class Qryop {
    *  @return The string version of this query operator.
    */
   public abstract String toString();
+
+  protected class DaaTPtr {
+    protected ScoreList scoreList;  // A qry arg's score list (if any)
+
+    protected InvList invList;    // A qry arg's inverted list (if any)
+
+    protected int nextDoc;    // The next document to examine
+  }
 }

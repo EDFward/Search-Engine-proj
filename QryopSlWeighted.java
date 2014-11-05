@@ -3,6 +3,16 @@ import java.util.List;
 
 public class QryopSlWeighted extends QryopSlAnd {
 
+  /**
+   * Weights of the query arguments.
+   */
+  protected final List<Double> weights;
+
+  /**
+   * Boolean flag indicating whether current operator should accept weight or query operator.
+   */
+  protected boolean acceptWeight;
+
   public QryopSlWeighted() {
     // the first argument should be a weight
     this.acceptWeight = true;
@@ -50,15 +60,5 @@ public class QryopSlWeighted extends QryopSlAnd {
     // meanwhile flip the accepting flag
     acceptWeight = true;
   }
-
-  /**
-   * Weights of the query arguments.
-   */
-  protected final List<Double> weights;
-
-  /**
-   * Boolean flag indicating whether current operator should accept weight or query operator.
-   */
-  protected boolean acceptWeight;
 }
 

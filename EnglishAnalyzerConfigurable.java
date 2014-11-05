@@ -38,36 +38,15 @@ import java.io.Reader;
  */
 public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
 
-  public enum StemmerType {
-    NONE, PORTER, KSTEM
-  }
+  private final CharArraySet stemExclusionSet;
 
   ;
-
-  private final CharArraySet stemExclusionSet;
 
   private Boolean doLowerCase = true;
 
   private Boolean doStopwordRemoval = true;
 
   private StemmerType stemmer = StemmerType.PORTER;
-
-  /**
-   * Returns an unmodifiable instance of the default stop words set.
-   *
-   * @return default stop words set.
-   */
-  public static CharArraySet getDefaultStopSet() {
-    return DefaultSetHolder.DEFAULT_STOP_SET;
-  }
-
-  /**
-   * Atomically loads the DEFAULT_STOP_SET in a lazy fashion once the outer
-   * class accesses the static final set the first time.;
-   */
-  private static class DefaultSetHolder {
-    static final CharArraySet DEFAULT_STOP_SET = StandardAnalyzer.STOP_WORDS_SET;
-  }
 
   /**
    * Builds an analyzer with the default stop words: {@link #getDefaultStopSet}.
@@ -100,6 +79,15 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
     super(matchVersion, stopwords);
     this.stemExclusionSet = CharArraySet.unmodifiableSet(CharArraySet.copy(matchVersion,
             stemExclusionSet));
+  }
+
+  /**
+   * Returns an unmodifiable instance of the default stop words set.
+   *
+   * @return default stop words set.
+   */
+  public static CharArraySet getDefaultStopSet() {
+    return DefaultSetHolder.DEFAULT_STOP_SET;
   }
 
   /**
@@ -161,5 +149,17 @@ public final class EnglishAnalyzerConfigurable extends StopwordAnalyzerBase {
     }
 
     return new TokenStreamComponents(source, result);
+  }
+
+  public enum StemmerType {
+    NONE, PORTER, KSTEM
+  }
+
+  /**
+   * Atomically loads the DEFAULT_STOP_SET in a lazy fashion once the outer
+   * class accesses the static final set the first time.;
+   */
+  private static class DefaultSetHolder {
+    static final CharArraySet DEFAULT_STOP_SET = StandardAnalyzer.STOP_WORDS_SET;
   }
 }

@@ -12,18 +12,47 @@ public class ScoreList {
 
   //  A little utility class to create a <docid, score> object.
 
-  protected class ScoreListEntry {
-    private int docid;
+  List<ScoreListEntry> scores = new ArrayList<ScoreListEntry>();
 
-    private double score;
+  /**
+   * Sift-down operation for heap structure.
+   *
+   * @param h           Heap as a fixed length array
+   * @param pos         Position in the heap to be sifted down
+   * @param externalIds Doc-ExternalId map for comparision
+   */
+  private static void sink(ScoreListEntry[] h, int pos, Map<ScoreListEntry, String> externalIds) {
+    int subRoot = pos;
+    while (subRoot * 2 + 1 < h.length) { // until the subroot is a leaf
+      int minChild = subRoot * 2 + 1;    // first get left child
 
-    private ScoreListEntry(int docid, double score) {
-      this.docid = docid;
-      this.score = score;
+      // if right child if smaller than left (score/external Id),
+      // let minChild point to it
+      if (minChild + 1 < h.length) {
+        if (h[minChild + 1].score < h[minChild].score) {
+          minChild++;
+        } else if (h[minChild].score == h[minChild + 1].score) {
+          String leftExtId = externalIds.get(h[minChild]),
+                  rightExtId = externalIds.get(h[minChild + 1]);
+          if (rightExtId.compareTo(leftExtId) > 0) {
+            minChild++;
+          }
+        }
+      }
+      // now compare the root and minChild
+      if (h[subRoot].score < h[minChild].score ||
+              (h[minChild].score == h[subRoot].score &&
+                      externalIds.get(h[subRoot]).compareTo(externalIds.get(h[minChild])) > 0)) {
+        return; // no need to sink down
+      } else {
+        // swap, then continue sinking
+        ScoreListEntry tmp = h[subRoot];
+        h[subRoot] = h[minChild];
+        h[minChild] = tmp;
+        subRoot = minChild;
+      }
     }
   }
-
-  List<ScoreListEntry> scores = new ArrayList<ScoreListEntry>();
 
   /**
    * Append a document score to a score list.
@@ -136,43 +165,14 @@ public class ScoreList {
     });
   }
 
-  /**
-   * Sift-down operation for heap structure.
-   *
-   * @param h           Heap as a fixed length array
-   * @param pos         Position in the heap to be sifted down
-   * @param externalIds Doc-ExternalId map for comparision
-   */
-  private static void sink(ScoreListEntry[] h, int pos, Map<ScoreListEntry, String> externalIds) {
-    int subRoot = pos;
-    while (subRoot * 2 + 1 < h.length) { // until the subroot is a leaf
-      int minChild = subRoot * 2 + 1;    // first get left child
+  protected class ScoreListEntry {
+    private int docid;
 
-      // if right child if smaller than left (score/external Id),
-      // let minChild point to it
-      if (minChild + 1 < h.length) {
-        if (h[minChild + 1].score < h[minChild].score) {
-          minChild++;
-        } else if (h[minChild].score == h[minChild + 1].score) {
-          String leftExtId = externalIds.get(h[minChild]),
-                  rightExtId = externalIds.get(h[minChild + 1]);
-          if (rightExtId.compareTo(leftExtId) > 0) {
-            minChild++;
-          }
-        }
-      }
-      // now compare the root and minChild
-      if (h[subRoot].score < h[minChild].score ||
-              (h[minChild].score == h[subRoot].score &&
-                      externalIds.get(h[subRoot]).compareTo(externalIds.get(h[minChild])) > 0)) {
-        return; // no need to sink down
-      } else {
-        // swap, then continue sinking
-        ScoreListEntry tmp = h[subRoot];
-        h[subRoot] = h[minChild];
-        h[minChild] = tmp;
-        subRoot = minChild;
-      }
+    private double score;
+
+    private ScoreListEntry(int docid, double score) {
+      this.docid = docid;
+      this.score = score;
     }
   }
 }

@@ -13,6 +13,19 @@ import java.io.IOException;
 public class QryopSlScore extends QryopSl {
 
   /**
+   * Records the data to calculate default score for Indri
+   * query operation after evaluation
+   */
+  private double ctfProb = -1;
+
+  /**
+   * Denotes the field of the original inverted list. Since
+   * #Score only covers QryopIl with one particular field,
+   * it can be recorded during evaluation.
+   */
+  private String field;
+
+  /**
    * Construct a new SCORE operator.  The SCORE operator accepts just
    * one argument.
    *
@@ -47,7 +60,7 @@ public class QryopSlScore extends QryopSl {
       if (ctfProb == -1) {
         QryEval.fatalError("Error: default score parameters not set up.");
       }
-      DocLengthStore docLengthStore = ((RetrievalModelIndri) r).getDocLengthStore();
+      DocLengthStore docLengthStore = QryEval.LENGTH_STORE;
       int mu = ((RetrievalModelIndri) r).getMu();
       double lambda = ((RetrievalModelIndri) r).getLambda();
       long doclen = docLengthStore.getDocLength(field, (int) docid);
@@ -185,11 +198,11 @@ public class QryopSlScore extends QryopSl {
     // necessary info to calculate query likelihood
     int mu = ((RetrievalModelIndri) r).getMu();
     double lambda = ((RetrievalModelIndri) r).getLambda();
-    DocLengthStore docLengthStore = ((RetrievalModelIndri) r).getDocLengthStore();
+    DocLengthStore docLengthStore = QryEval.LENGTH_STORE;
     int df = result.invertedList.df;
     field = result.invertedList.field;
     // calculate the 2 parameters in query likelihood calculation
-    ctfProb = ((float) result.invertedList.ctf) / QryEval.READER.getSumTotalTermFreq(field);
+    ctfProb = ((double) result.invertedList.ctf) / QryEval.READER.getSumTotalTermFreq(field);
     double ctfParam1 = mu * ctfProb;
     double ctfParam2 = (1 - lambda) * ctfProb;
 
@@ -207,17 +220,4 @@ public class QryopSlScore extends QryopSl {
     }
     return result;
   }
-
-  /**
-   * Records the data to calculate default score for Indri
-   * query operation after evaluation
-   */
-  private double ctfProb = -1;
-
-  /**
-   * Denotes the field of the original inverted list. Since
-   * #Score only covers QryopIl with one particular field,
-   * it can be recorded during evaluation.
-   */
-  private String field;
 }

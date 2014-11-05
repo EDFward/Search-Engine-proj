@@ -5,6 +5,11 @@ import java.util.Vector;
 
 public class QryopIlWindow extends QryopIl {
 
+  /**
+   * The only parameter for near operator, indicating the size of the window.
+   */
+  private final int distance;
+
   public QryopIlWindow(int distance) {
     this.distance = distance;
   }
@@ -143,9 +148,4 @@ public class QryopIlWindow extends QryopIl {
 
     return true;
   }
-
-  /**
-   * The only parameter for near operator, indicating the size of the window.
-   */
-  private final int distance;
 }

@@ -5,6 +5,12 @@ import java.util.Vector;
 
 public class QryopIlNear extends QryopIl {
 
+  /**
+   * the only parameter for near operator, indicating the distance
+   * allowed between each word
+   */
+  private final int distance;
+
   public QryopIlNear(int distance) {
     this.distance = distance;
   }
@@ -144,10 +150,4 @@ public class QryopIlNear extends QryopIl {
 
     return true;
   }
-
-  /**
-   * the only parameter for near operator, indicating the distance
-   * allowed between each word
-   */
-  private final int distance;
 }
