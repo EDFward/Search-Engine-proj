@@ -335,12 +335,12 @@ public class QryEval {
           combinedQuery.add(1 - fbOrigWeight);
           combinedQuery.add(expandedQuery);
           result = combinedQuery.evaluate(model);
-          result.docScores.sortAndTruncate();
         } else {
           // one simple run of evaluation
           result = parsedQuery.evaluate(model);
         }
 
+        result.docScores.sortAndTruncate();
         // write to evaluation file
         if (result.docScores.scores.size() < 1) {
           rankWriter.write(queryId + " Q0 dummy 1 0 run-1\n");
