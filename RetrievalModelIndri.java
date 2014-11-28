@@ -1,3 +1,10 @@
+import org.apache.lucene.index.Term;
+import org.apache.lucene.util.BytesRef;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Indri retrieval model in homework2
  *
@@ -71,5 +78,37 @@ public class RetrievalModelIndri extends RetrievalModel {
    */
   public int getMu() {
     return mu;
+  }
+
+  public double getScore(String[] queryStems, int internalDocId, String field) throws IOException {
+    TermVector doc = new TermVector(internalDocId, field);
+    double totalScore = 0;
+    long docLen = QryEval.LENGTH_STORE.getDocLength(field, internalDocId);
+    long totalTermFreq = QryEval.READER.getSumTotalTermFreq(field);
+
+    Map<String, Integer> docStemMap = new HashMap<String, Integer>(doc.stemsLength());
+    for (int i = 0; i < doc.stemsLength(); ++i)
+      docStemMap.put(doc.stemString(i), i);
+
+    int noMatchCount = 0, tf;
+    long ctf;
+    for (String queryStem : queryStems) {
+      if (!docStemMap.containsKey(queryStem)) {
+        ++noMatchCount;
+        tf = 0;
+        ctf = QryEval.READER.totalTermFreq(new Term(field, new BytesRef(queryStem)));
+      } else {
+        int i = docStemMap.get(queryStem);
+        tf = doc.stemFreq(i);
+        ctf = doc.totalStemFreq(i);
+      }
+      double ctfProb = ((double) ctf) / totalTermFreq;
+      totalScore *= lambda * (tf + mu * ctfProb) / (docLen + mu) + (1 - lambda) * ctfProb;
+    }
+
+    if (noMatchCount == queryStems.length)
+      return 0;
+    else
+      return Math.pow(totalScore, queryStems.length);
   }
 }

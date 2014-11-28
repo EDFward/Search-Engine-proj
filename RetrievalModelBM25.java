@@ -1,4 +1,7 @@
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * BM25 retrieval model in homework 2.
@@ -21,22 +24,6 @@ public class RetrievalModelBM25 extends RetrievalModel {
    * Parameter b in BM25 retrieval model.
    */
   private double b;
-
-  /**
-   * Document length reader.
-   */
-  private DocLengthStore docLengthStore;
-
-  /**
-   * Initialize the document length reader for future evaluation.
-   */
-  public RetrievalModelBM25() {
-    try {
-      docLengthStore = new DocLengthStore(QryEval.READER);
-    } catch (IOException e) {
-      QryEval.fatalError("Error: DocLengthStore initialization error");
-    }
-  }
 
   /**
    * Set a retrieval model parameter.
@@ -107,10 +94,29 @@ public class RetrievalModelBM25 extends RetrievalModel {
     return b;
   }
 
-  /**
-   * Parameter lambda in query likelihood calculation.
-   */
-  public DocLengthStore getDocLengthStore() {
-    return docLengthStore;
+  public double getScore(String[] queryStems, int internalDocId, String field) throws IOException {
+    TermVector doc = new TermVector(internalDocId, field);
+    double totalScore = 0;
+    double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
+            (float) QryEval.READER.getDocCount(field);
+    long docLen = QryEval.LENGTH_STORE.getDocLength(field, internalDocId);
+    long docCount = QryEval.READER.getDocCount(field);
+
+    // qtf is 1
+    double qtf = 1;
+    double userWeight = (k_3 + 1) * qtf / (k_3 + qtf);
+
+    Set<String> queryStemSet = new HashSet<String>(Arrays.asList(queryStems));
+    for (int i = 0; i < doc.stemsLength(); ++i) {
+      String stem = doc.stemString(i);
+      if (queryStemSet.contains(stem)) {
+        int df = doc.stemDf(i);
+        double idf = Math.log((docCount - df + 0.5) / (df + 0.5));
+        int tf = doc.stemFreq(i);
+        double normTf = tf / (tf + k_1 * (1 - b + b * docLen / avgDocLen));
+        totalScore += normTf * idf * userWeight;
+      }
+    }
+    return totalScore;
   }
 }

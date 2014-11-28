@@ -30,7 +30,6 @@ public class QryopSlScore extends QryopSl {
    * one argument.
    *
    * @param q The query operator argument.
-   * @return @link{QryopSlScore}
    */
   public QryopSlScore(Qryop q) {
     this.args.add(q);
@@ -166,7 +165,7 @@ public class QryopSlScore extends QryopSl {
     // necessary info to calculate BM 25 scores
     double k_1 = ((RetrievalModelBM25) r).getK_1(),
             b = ((RetrievalModelBM25) r).getB();
-    DocLengthStore docLengthStore = ((RetrievalModelBM25) r).getDocLengthStore();
+    DocLengthStore docLengthStore = QryEval.LENGTH_STORE;
     String field = result.invertedList.field;
     double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
             (float) QryEval.READER.getDocCount(field);
