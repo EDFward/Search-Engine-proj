@@ -14,10 +14,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class QryEval {
@@ -70,37 +67,51 @@ public class QryEval {
     // read PageRank file
     Map<Integer, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
 
-    // TRAINING!
     Map<Integer, String> trainingQueries = Utility.readQueries(
             params.get("letor:trainingQueryFile"));
-    Map<Integer, List<int[]>> trainingRelevance = Utility.readRelevance(
-            params.get("letor:trainingQrelsFile"));
 
     final boolean defaultFeatureMask[] = new boolean[18];
     Arrays.fill(defaultFeatureMask, true);
-    Map<Integer, List<RankFeature>> trainingData = new HashMap<Integer, List<RankFeature>>();
-    for (Map.Entry<Integer, String> trainingEntry : trainingQueries.entrySet()) {
-      int queryId = trainingEntry.getKey();
-      String[] query = Utility.tokenizeQuery(trainingEntry.getValue());
-      List<int[]> docRelevances = trainingRelevance.get(queryId);
-      for (int[] docRelevance : docRelevances) {
-        int docId = docRelevance[0], score = docRelevance[1];
-        List<Double> featureVector = Utility.createFeatureVector(docId, defaultFeatureMask, query,
-                pageRanks, (RetrievalModelLeToR) model);
-
-        List<RankFeature> featureList;
-        if (!trainingData.containsKey(queryId)) {
-          featureList = new ArrayList<RankFeature>();
-          trainingData.put(queryId, featureList);
-        } else {
-          featureList = trainingData.get(queryId);
-        }
-        featureList.add(new RankFeature(score, featureVector));
+    // build training data
+    Map<Integer, List<RankFeature>> trainingRelevance = new HashMap<Integer, List<RankFeature>>();
+    String line;
+    BufferedReader rankFileReader = new BufferedReader(
+            new FileReader(params.get("letor:trainingQrelsFile")));
+    while ((line = rankFileReader.readLine()) != null) {
+      line = line.trim();
+      if (line.isEmpty()) {
+        break;
       }
+      String[] parts = line.split("\\s+");
+      int queryId = Integer.parseInt(parts[0]);
+      String externalId = parts[2];
+      int rank = Integer.parseInt(parts[3]);
+
+      String queryStems[] = Utility.tokenizeQuery(trainingQueries.get(queryId));
+
+      // update document-relevance
+      List<RankFeature> featureList;
+      if (!trainingRelevance.containsKey(queryId)) {
+        featureList = new ArrayList<RankFeature>();
+        trainingRelevance.put(queryId, featureList);
+      } else {
+        featureList = trainingRelevance.get(queryId);
+      }
+      List<Double> featureVector = Utility.createFeatureVector(externalId, defaultFeatureMask,
+              queryStems, pageRanks, (RetrievalModelLeToR) model);
+      featureList.add(new RankFeature(externalId, rank, featureVector));
     }
 
-    // NORMALIZING!
-    Utility.normalize(trainingData);
+    // normalizing
+    Utility.normalize(trainingRelevance);
+
+    // write features to file
+    Utility.writeFeatures(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
+
+    // begin training!
+    Utility.runClassifier(params.get("letor:svmRankLearnPath"),
+            Double.parseDouble(params.get("letor:svmRankParamC")),
+            params.get("letor:trainingFeatureVectorsFile"), params.get("letor:svmRankModelFile"));
 
     // open query input file and read queries
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));

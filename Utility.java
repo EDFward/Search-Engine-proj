@@ -5,10 +5,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.*;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.StringReader;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -20,41 +17,6 @@ public class Utility {
    */
   static String usage = "Usage:  java " + System.getProperty("sun.java.command")
           + " paramFile\n\n";
-
-  /**
-   * Read relevance from training relevance file.
-   *
-   * @param relevanceFile File path for doc-relevance file
-   * @return A map between query id and doc-relevance
-   * @throws Exception
-   */
-  public static Map<Integer, List<int[]>> readRelevance(String relevanceFile) throws Exception {
-    String line;
-    Map<Integer, List<int[]>> docRevelance = new HashMap<Integer, List<int[]>>();
-
-    BufferedReader rankFileReader = new BufferedReader(new FileReader(relevanceFile));
-    while ((line = rankFileReader.readLine()) != null) {
-      line = line.trim();
-      if (line.isEmpty()) {
-        break;
-      }
-      String[] parts = line.split("\\s+");
-      int queryId = Integer.parseInt(parts[0]);
-      int internalId = getInternalDocid(parts[2]);
-      int score = Integer.parseInt(parts[3]);
-
-      // update document-relevance
-      List<int[]> relevancy;
-      if (!docRevelance.containsKey(queryId)) {
-        relevancy = new ArrayList<int[]>();
-        docRevelance.put(queryId, relevancy);
-      } else {
-        relevancy = docRevelance.get(queryId);
-      }
-      relevancy.add(new int[] { internalId, score });
-    }
-    return docRevelance;
-  }
 
   public static Map<Integer, String> readQueries(String queryFile)
           throws IOException {
@@ -108,6 +70,51 @@ public class Utility {
       }
     }
     return pageRanks;
+  }
+
+  public static void writeFeatures(String filePath, Map<Integer, List<RankFeature>> featureMap)
+          throws IOException {
+    BufferedWriter featureWriter = new BufferedWriter(new FileWriter(new File(filePath)));
+    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
+      int queryId = entry.getKey();
+      for (RankFeature feature : entry.getValue()) {
+        featureWriter.write(String
+                .format("%d qid:%d %s# %s\n", feature.getRank(), queryId, feature.featureString(),
+                        feature.getExternalId()));
+      }
+    }
+    featureWriter.close();
+  }
+
+  public static void runClassifier(String execPath, double c, String qrelsFeatureOutputFile,
+          String modelOutputFile) throws Exception {
+    Process cmdProc = Runtime.getRuntime().exec(
+            new String[] { execPath, "-c", String.valueOf(c), qrelsFeatureOutputFile,
+                    modelOutputFile });
+
+    // The stdout/stderr consuming code MUST be included.
+    // It prevents the OS from running out of output buffer space and stalling.
+
+    // consume stdout and print it out for debugging purposes
+    BufferedReader stdoutReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getInputStream()));
+    String line;
+    while ((line = stdoutReader.readLine()) != null) {
+      System.out.println(line);
+    }
+    // consume stderr and print it for debugging purposes
+    BufferedReader stderrReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getErrorStream()));
+    while ((line = stderrReader.readLine()) != null) {
+      System.out.println(line);
+    }
+
+    // get the return value from the executable. 0 means success, non-zero
+    // indicates a problem
+    int retValue = cmdProc.waitFor();
+    if (retValue != 0) {
+      throw new Exception("SVM Rank crashed.");
+    }
   }
 
   /**
@@ -229,10 +236,11 @@ public class Utility {
                     (1024L * 1024L)) + " MB");
   }
 
-  public static List<Double> createFeatureVector(int docId, boolean[] featureMasks,
+  public static List<Double> createFeatureVector(String externalId, boolean[] featureMasks,
           String[] queryStems,
           Map<Integer, Double> pageRanks, RetrievalModelLeToR letorModel)
-          throws IOException {
+          throws Exception {
+    int docId = getInternalDocid(externalId);
     List<Double> features = new ArrayList<Double>();
     if (featureMasks.length < 18) {
       fatalError("Error: wrong size for feature mask when creating features");
