@@ -31,12 +31,19 @@ public class TermVector {
 
   Term[] terms;
 
+  int docId;
+
+  String field;
+
   /**
    * Constructor.  Create a TermVector for a field in a document.
    *
    * @return {@link TermVector}
    */
   public TermVector(int docId, String fieldName) throws IOException {
+
+    this.docId = docId;
+    this.field = fieldName;
 
     //  Fetch the term vector.
 
@@ -94,6 +101,14 @@ public class TermVector {
         positions[ithPositions.nextPosition()] = i + 1;
       }
     }
+  }
+
+  public String getField() {
+    return field;
+  }
+
+  public int getDocId() {
+    return docId;
   }
 
   /**

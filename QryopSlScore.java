@@ -57,7 +57,7 @@ public class QryopSlScore extends QryopSl {
 
     if (r instanceof RetrievalModelIndri) {
       if (ctfProb == -1) {
-        QryEval.fatalError("Error: default score parameters not set up.");
+        Utility.fatalError("Error: default score parameters not set up.");
       }
       DocLengthStore docLengthStore = QryEval.LENGTH_STORE;
       int mu = ((RetrievalModelIndri) r).getMu();

@@ -46,7 +46,7 @@ public class QryopSlSum extends QryopSl {
   @Override
   public QryResult evaluate(RetrievalModel r) throws IOException {
     if (!(r instanceof RetrievalModelBM25)) {
-      QryEval.fatalError("Error: #SUM only supports BM25 model");
+      Utility.fatalError("Error: #SUM only supports BM25 model");
     }
 
     allocDaaTPtrs(r);

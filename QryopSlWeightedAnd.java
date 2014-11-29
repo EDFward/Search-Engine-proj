@@ -57,7 +57,7 @@ public class QryopSlWeightedAnd extends QryopSlWeighted {
     QryResult result = new QryResult();
 
     if (!(r instanceof RetrievalModelIndri)) {
-      QryEval.fatalError("Error: WAND Only supports Indri.");
+      Utility.fatalError("Error: WAND Only supports Indri.");
     }
 
     int minDocId;

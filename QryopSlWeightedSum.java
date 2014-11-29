@@ -56,7 +56,7 @@ public class QryopSlWeightedSum extends QryopSlWeighted {
     QryResult result = new QryResult();
 
     if (!(r instanceof RetrievalModelIndri)) {
-      QryEval.fatalError("Error: WSUM Only supports Indri.");
+      Utility.fatalError("Error: WSUM Only supports Indri.");
     }
 
     int minDocId;

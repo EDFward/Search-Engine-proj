@@ -36,7 +36,7 @@ public class RetrievalModelIndri extends RetrievalModel {
     } else if (parameterName.equals("lambda")) {
       lambda = value;
     } else {
-      QryEval.fatalError("Error: Unknown parameter name for retrieval model " +
+      Utility.fatalError("Error: Unknown parameter name for retrieval model " +
               "RankedBoolean: " +
               parameterName);
     }
@@ -58,7 +58,7 @@ public class RetrievalModelIndri extends RetrievalModel {
     } else if (parameterName.equals("lambda")) {
       lambda = Double.parseDouble(value);
     } else {
-      QryEval.fatalError("Error: Unknown parameter name for retrieval model " +
+      Utility.fatalError("Error: Unknown parameter name for retrieval model " +
               "RankedBoolean: " +
               parameterName);
     }
@@ -80,10 +80,10 @@ public class RetrievalModelIndri extends RetrievalModel {
     return mu;
   }
 
-  public double getScore(String[] queryStems, int internalDocId, String field) throws IOException {
-    TermVector doc = new TermVector(internalDocId, field);
+  public double getScore(String[] queryStems, TermVector doc) throws IOException {
     double totalScore = 0;
-    long docLen = QryEval.LENGTH_STORE.getDocLength(field, internalDocId);
+    String field = doc.getField();
+    long docLen = QryEval.LENGTH_STORE.getDocLength(field, doc.getDocId());
     long totalTermFreq = QryEval.READER.getSumTotalTermFreq(field);
 
     Map<String, Integer> docStemMap = new HashMap<String, Integer>(doc.stemsLength());

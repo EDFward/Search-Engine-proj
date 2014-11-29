@@ -106,7 +106,7 @@ public class ScoreList {
       for (int i = 0; i < 100; ++i) {
         ScoreListEntry entry = scores.get(i);
         heap[i] = entry;
-        externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
+        externalIds.put(entry, Utility.getExternalDocid(entry.docid));
       }
 
       // heapify
@@ -121,7 +121,7 @@ public class ScoreList {
         {
           continue;
         } else { // now have to compare next with heap[0]
-          String nextExternalId = QryEval.getExternalDocid(next.docid);
+          String nextExternalId = Utility.getExternalDocid(next.docid);
           // decide whether to evict heap[0] or not
           if (next.score == heap[0].score &&
                   nextExternalId.compareTo(externalIds.get(heap[0])) > 0) {
@@ -144,7 +144,7 @@ public class ScoreList {
     } else {
       // otherwise store the external ID and then directly sort
       for (ScoreListEntry entry : scores) {
-        externalIds.put(entry, QryEval.getExternalDocid(entry.docid));
+        externalIds.put(entry, Utility.getExternalDocid(entry.docid));
       }
     }
 

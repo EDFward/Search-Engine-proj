@@ -9,18 +9,15 @@
  *  Copyright (c) 2014, Carnegie Mellon University.  All Rights Reserved.
  */
 
-import org.apache.lucene.analysis.Analyzer.TokenStreamComponents;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class QryEval {
@@ -39,144 +36,18 @@ public class QryEval {
    * Create and configure an English analyzer that will be used for
    * query parsing.
    */
-  public static EnglishAnalyzerConfigurable analyzer =
+  public static EnglishAnalyzerConfigurable ANALYZER =
           new EnglishAnalyzerConfigurable(Version.LUCENE_43);
 
-  /**
-   * Usage information
-   */
-  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
-          + " paramFile\n\n";
+  private static RetrievalModel model;
 
   /**
    * Static initializer.
    */
   static {
-    analyzer.setLowercase(true);
-    analyzer.setStopwordRemoval(true);
-    analyzer.setStemmer(EnglishAnalyzerConfigurable.StemmerType.KSTEM);
-  }
-
-  /**
-   * Generate query results from initial ranking file.
-   *
-   * @param queryIds             Corresponding query id for each ranking
-   * @param fbInitialRankingFile File path for initial ranking file
-   * @return A map between query id and query result
-   * @throws Exception
-   */
-  private static Map<Integer, QryResult> getRankResults(Collection<Integer> queryIds,
-          String fbInitialRankingFile) throws Exception {
-    String line;
-    Map<Integer, QryResult> initRankResultMap = new HashMap<Integer, QryResult>();
-    for (int i : queryIds)
-      initRankResultMap.put(i, new QryResult());
-
-    BufferedReader rankFileReader = new BufferedReader(new FileReader(fbInitialRankingFile));
-    while ((line = rankFileReader.readLine()) != null) {
-      line = line.trim();
-      if (line.isEmpty()) {
-        break;
-      }
-      String[] parts = line.split("\\s+");
-      int queryId = Integer.parseInt(parts[0]);
-      // update QryResult according to query id
-      QryResult initRankResult = initRankResultMap.get(queryId);
-      int internalId = getInternalDocid(parts[2]);
-      double score = Double.parseDouble(parts[4]);
-      initRankResult.docScores.add(internalId, score);
-    }
-    return initRankResultMap;
-  }
-
-  /**
-   * Expand query from query results.
-   *
-   * @param queryResult Query result
-   * @param fbDocs      Number of feedback documents
-   * @param fbTerms     Number of feedback terms
-   * @param fbMu        Parameter mu for p(t|d)
-   * @return Expaneded query from previously evaluated query result
-   */
-  private static Qryop expandQuery(QryResult queryResult, int fbDocs, int fbTerms, int fbMu)
-          throws IOException {
-    Map<String, Double> termScore = new HashMap<String, Double>();
-    Map<String, Double> ctfProb = new HashMap<String, Double>();
-    List<TermVector> termVectorList = new ArrayList<TermVector>(fbDocs);
-    List<Double> scoreList = new ArrayList<Double>(fbDocs);
-    List<Long> lengthList = new ArrayList<Long>(fbDocs);
-    long fieldLength = READER.getSumTotalTermFreq("body");
-
-    for (int i = 0; i < fbDocs && i < queryResult.docScores.scores.size(); ++i) {
-      int internalId = queryResult.docScores.getDocid(i);
-
-      Double score = queryResult.docScores.getDocidScore(i);
-      // if in log space, convert back
-      if (score < 0)
-        score = Math.exp(score);
-
-      // record length, score and term vector separately
-      lengthList.add(LENGTH_STORE.getDocLength("body", internalId));
-      scoreList.add(score);
-      TermVector termVector = new TermVector(internalId, "body");
-      termVectorList.add(termVector);
-
-      // add term term string to score map, and record MLE of p(t|c)
-      for (int j = 1; j < termVector.stemsLength(); ++j) {
-        String termString = termVector.stemString(j);
-        // ignore terms with comma and period
-        if (termString.contains(",") || termString.contains(".")) {
-          continue;
-        }
-        termScore.put(termString, 0d);
-        ctfProb.put(termString, ((double) termVector.totalStemFreq(j)) / fieldLength);
-      }
-    }
-
-    // iterate all documents to get terms and their scores
-    for (int i = 0; i < termVectorList.size(); ++i) {
-      TermVector termVector = termVectorList.get(i);
-      // read term freq for this particular document
-      Map<String, Integer> termFreq = new HashMap<String, Integer>();
-      for (int j = 1; j < termVector.stemsLength(); ++j) {
-        termFreq.put(termVector.stemString(j), termVector.stemFreq(j));
-      }
-      long length = lengthList.get(i);
-      double score = scoreList.get(i);
-
-      // update score p(t|I) for each term, even if it's not present in one document
-      for (String term : termScore.keySet()) {
-        double currentScore = termScore.get(term);
-        int tf = 0;
-        if (termFreq.containsKey(term)) {
-          tf = termFreq.get(term);
-        }
-        double tGivenC = ctfProb.get(term);
-        currentScore += (tf + fbMu * tGivenC) / (length + fbMu) * score * Math.log(1 / tGivenC);
-        termScore.put(term, currentScore);
-      }
-    }
-
-    // sort termScore by their score
-    List<Map.Entry<String, Double>> sortedTermScore = new ArrayList<Map.Entry<String, Double>>(
-            termScore.entrySet());
-    Collections.sort(sortedTermScore, new Comparator<Map.Entry<String, Double>>() {
-      @Override
-      public int compare(Map.Entry<String, Double> e1, Map.Entry<String, Double> e2) {
-        // need descending order
-        return e2.getValue().compareTo(e1.getValue());
-      }
-    });
-
-    // build the final query!
-    QryopSlWeightedAnd expandedQuery = new QryopSlWeightedAnd();
-    int termLimit = Math.min(fbTerms, sortedTermScore.size());
-    for (int i = 0; i < termLimit; ++i) {
-      Map.Entry<String, Double> entry = sortedTermScore.get(i);
-      expandedQuery.add(entry.getValue());
-      expandedQuery.add(new QryopIlTerm(entry.getKey(), "body"));
-    }
-    return expandedQuery;
+    ANALYZER.setLowercase(true);
+    ANALYZER.setStopwordRemoval(true);
+    ANALYZER.setStemmer(EnglishAnalyzerConfigurable.StemmerType.KSTEM);
   }
 
   /**
@@ -189,157 +60,67 @@ public class QryEval {
 
     // must supply parameter file
     if (args.length < 1) {
-      System.err.println(usage);
+      System.err.println(Utility.usage);
       System.exit(1);
     }
 
     // read in the parameter file; one parameter per line in format of key=value
-    Map<String, String> params = new HashMap<String, String>();
-    Scanner scan = new Scanner(new File(args[0]));
-    String line;
-    do {
-      line = scan.nextLine();
-      String[] pair = line.split("=");
-      params.put(pair[0].trim(), pair[1].trim());
-    } while (scan.hasNext());
-    scan.close();
+    Map<String, String> params = evaluateParams(args[0]);
 
-    // parameters required for this example to run
-    if (!params.containsKey("indexPath")) {
-      fatalError("Error: Parameter 'indexPath' was missing.");
+    // read PageRank file
+    Map<Integer, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
+
+    // TRAINING!
+    Map<Integer, String> trainingQueries = Utility.readQueries(
+            params.get("letor:trainingQueryFile"));
+    Map<Integer, List<int[]>> trainingRelevance = Utility.readRelevance(
+            params.get("letor:trainingQrelsFile"));
+
+    final boolean defaultFeatureMask[] = new boolean[18];
+    Arrays.fill(defaultFeatureMask, true);
+    List<RankFeature> trainingData = new ArrayList<RankFeature>();
+    for (Map.Entry<Integer, String> trainingEntry : trainingQueries.entrySet()) {
+      int queryId = trainingEntry.getKey();
+      String[] query = Utility.tokenizeQuery(trainingEntry.getValue());
+      List<int[]> docRelevances = trainingRelevance.get(queryId);
+      for (int[] docRelevance : docRelevances) {
+        int docId = docRelevance[0], score = docRelevance[1];
+        List<Double> featureVector = Utility.createFeatureVector(docId, defaultFeatureMask, query,
+                pageRanks, (RetrievalModelLeToR) model);
+        trainingData.add(new RankFeature(queryId, score, featureVector));
+      }
     }
 
-    // open the index and LENGTH_STORE
-    READER = DirectoryReader.open(FSDirectory.open(new File(params.get("indexPath"))));
-    try {
-      LENGTH_STORE = new DocLengthStore(QryEval.READER);
-    } catch (IOException e) {
-      fatalError("Error: DocLengthStore initialization error");
-    }
+    // NORMALIZING!
 
-    if (READER == null) {
-      fatalError(usage);
-    }
-
-    // define the retrieval model from parameter file
-    RetrievalModel model = null;
-    try {
-      model = (RetrievalModel) Class.forName(
-              "RetrievalModel" + params.get("retrievalAlgorithm")).newInstance();
-    } catch (Exception e) {
-      fatalError("Error: Failed to load specified retrieval model.");
-    }
 
     // open query input file and read queries
-    Map<Integer, String> queryStrings = new LinkedHashMap<Integer, String>();
-    BufferedReader queryFileReader = null;
+    Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
+
+    BufferedWriter rankWriter = null;
     try {
-      queryFileReader = new BufferedReader(new FileReader(params.get("queryFilePath")));
-
-      while ((line = queryFileReader.readLine()) != null) {
-        line = line.trim();
-        if (line.isEmpty()) {
-          break;
-        }
-
-        String[] parts = line.split(":", 2);
-        // add queryId: queryString to the map
-        queryStrings.put(Integer.parseInt(parts[0]), parts[1]);
-      }
-    } catch (Exception e) {
-      fatalError("Error: Read/Evaluate query file failed.");
-    } finally {
-      assert queryFileReader != null;
-      queryFileReader.close();
-    }
-
-    // evaluate and create the trec_eval output
-    // take different ranking source according to feedback parameters
-    BufferedWriter rankWriter = null, queryWriter = null;
-    Map<Integer, QryResult> initRankResult = null;
-    boolean needFeedBack = params.containsKey("fb") && (params.get("fb").equalsIgnoreCase("true"));
-    if (needFeedBack) {
-      if (params.containsKey("fbExpansionQueryFile")) {
-        queryWriter = new BufferedWriter(
-                new FileWriter(new File(params.get("fbExpansionQueryFile"))));
-      }
-      if (params.containsKey("fbInitialRankingFile"))
-        initRankResult = getRankResults(queryStrings.keySet(), params.get("fbInitialRankingFile"));
-    }
-
-    try {
-      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
       // add default query operator depending on retrieval model
       // and set parameters accordingly
       Qryop defaultQryop;
-
+      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
       QryResult result;
 
-      if (model instanceof RetrievalModelBM25) {
-        model.setParameter("k_1", params.get("BM25:k_1"));
-        model.setParameter("k_3", params.get("BM25:k_3"));
-        model.setParameter("b", params.get("BM25:b"));
+      if (model instanceof RetrievalModelBM25 || model instanceof RetrievalModelLeToR) {
         defaultQryop = new QryopSlSum();
       } else if (model instanceof RetrievalModelIndri) {
-        model.setParameter("mu", params.get("Indri:mu"));
-        model.setParameter("lambda", params.get("Indri:lambda"));
         defaultQryop = new QryopSlAnd();
       } else {
         // no parameter to read
         defaultQryop = new QryopSlOr();
       }
 
-      for (Map.Entry<Integer, String> entry : queryStrings.entrySet()) {
+      for (Map.Entry<Integer, String> entry : testQueries.entrySet()) {
         int queryId = entry.getKey();
         defaultQryop.clear();
         // parse the query, then evaluate
         Qryop parsedQuery = parseQuery(entry.getValue(), defaultQryop);
-
-        /**
-         * If relevance feedback is specified, re-evaluate the query
-         */
-        if (needFeedBack) {
-          Qryop expandedQuery;
-          int fbDocs = 0;
-          int fbTerms = 0;
-          int fbMu = 0;
-          double fbOrigWeight = 0;
-          try {
-            fbDocs = Integer.parseInt(params.get("fbDocs"));
-            fbTerms = Integer.parseInt(params.get("fbTerms"));
-            fbMu = Integer.parseInt(params.get("fbMu"));
-            fbOrigWeight = Double.parseDouble(params.get("fbOrigWeight"));
-          } catch (Exception e) {
-            e.printStackTrace();
-            fatalError("ERROR: Parsing FB parameters error!");
-          }
-          if (initRankResult == null) {
-            // expand by my result
-            result = parsedQuery.evaluate(model);
-            result.docScores.sortAndTruncate();
-            expandedQuery = expandQuery(result, fbDocs, fbTerms, fbMu);
-          } else {
-            // expand by init rank file
-            result = initRankResult.get(queryId);
-            expandedQuery = expandQuery(result, fbDocs, fbTerms, fbMu);
-          }
-
-          // write expanded query if needed
-          if (queryWriter != null) {
-            queryWriter.write(queryId + ": " + expandedQuery + "\n");
-          }
-
-          QryopSlWeightedAnd combinedQuery = new QryopSlWeightedAnd();
-          combinedQuery.add(fbOrigWeight);
-          combinedQuery.add(parsedQuery);
-          combinedQuery.add(1 - fbOrigWeight);
-          combinedQuery.add(expandedQuery);
-          result = combinedQuery.evaluate(model);
-        } else {
-          // one simple run of evaluation
-          result = parsedQuery.evaluate(model);
-        }
-
+        // one simple run of evaluation
+        result = parsedQuery.evaluate(model);
         result.docScores.sortAndTruncate();
         // write to evaluation file
         if (result.docScores.scores.size() < 1) {
@@ -348,7 +129,7 @@ public class QryEval {
           for (int j = 0; j < result.docScores.scores.size(); ++j) {
             String s = String.format("%d Q0 %s %d %.10f run-1\n",
                     queryId,                                        // query id
-                    getExternalDocid(result.docScores.getDocid(j)), // external id
+                    Utility.getExternalDocid(result.docScores.getDocid(j)), // external id
                     j + 1,                                          // rank
                     result.docScores.getDocidScore(j));
             rankWriter.write(s);
@@ -357,69 +138,17 @@ public class QryEval {
       }
     } catch (Exception e) {
       e.printStackTrace();
-      fatalError("Error: Evaluation failed.");
+      Utility.fatalError("Error: Evaluation failed.");
     } finally {
       if (rankWriter != null) {
         rankWriter.close();
-      }
-      if (queryWriter != null) {
-        queryWriter.close();
       }
     }
 
     // print evaluation time
     final long endTime = System.currentTimeMillis();
     System.out.println("Total evaluation time: " + (endTime - startTime) / 1000.0 + " seconds");
-    printMemoryUsage(false);
-  }
-
-  /**
-   * Write an error message and exit.  This can be done in other
-   * ways, but I wanted something that takes just one statement so
-   * that it is easy to insert checks without cluttering the code.
-   *
-   * @param message The error message to write before exiting.
-   * @return void
-   */
-  static void fatalError(String message) {
-    System.err.println(message);
-    System.exit(1);
-  }
-
-  /**
-   * Get the external document id for a document specified by an
-   * internal document id. If the internal id doesn't exists, returns null.
-   *
-   * @param iid The internal document id of the document.
-   * @throws IOException
-   */
-  static String getExternalDocid(int iid) throws IOException {
-    Document d = QryEval.READER.document(iid);
-    return d.get("externalId");
-  }
-
-  /**
-   * Finds the internal document id for a document specified by its
-   * external id, e.g. clueweb09-enwp00-88-09710.  If no such
-   * document exists, it throws an exception.
-   *
-   * @param externalId The external document id of a document.s
-   * @return An internal doc id suitable for finding document vectors etc.
-   * @throws Exception
-   */
-  static int getInternalDocid(String externalId) throws Exception {
-    Query q = new TermQuery(new Term("externalId", externalId));
-
-    IndexSearcher searcher = new IndexSearcher(QryEval.READER);
-    TopScoreDocCollector collector = TopScoreDocCollector.create(1, false);
-    searcher.search(q, collector);
-    ScoreDoc[] hits = collector.topDocs().scoreDocs;
-
-    if (hits.length < 1) {
-      throw new Exception("External id not found.");
-    } else {
-      return hits[0].doc;
-    }
+    Utility.printMemoryUsage(false);
   }
 
   /**
@@ -430,7 +159,7 @@ public class QryEval {
    * @return A query tree
    * @throws IOException
    */
-  static Qryop parseQuery(String qString, Qryop defaultQryop) throws IOException {
+  private static Qryop parseQuery(String qString, Qryop defaultQryop) throws IOException {
 
     Qryop currentOp = defaultQryop;
     Stack<Qryop> stack = new Stack<Qryop>();
@@ -481,7 +210,7 @@ public class QryEval {
           stack.push(currentOp);
         } catch (NumberFormatException e) {
           e.printStackTrace();
-          fatalError("Error: Wrong format for NEAR argument.");
+          Utility.fatalError("Error: Wrong format for NEAR argument.");
         }
       } else if (token.toLowerCase().startsWith("#window")) {
         try {
@@ -490,7 +219,7 @@ public class QryEval {
           stack.push(currentOp);
         } catch (NumberFormatException e) {
           e.printStackTrace();
-          fatalError("Error: Wrong format for WINDOW argument.");
+          Utility.fatalError("Error: Wrong format for WINDOW argument.");
         }
       } else if (token.startsWith(")")) {
         /*
@@ -526,7 +255,7 @@ public class QryEval {
           token = parts[0];
         }
 
-        String[] tokenizeResult = tokenizeQuery(token);
+        String[] tokenizeResult = Utility.tokenizeQuery(token);
         if (tokenizeResult.length != 0) {
           assert currentOp != null;
           currentOp.add(new QryopIlTerm(tokenizeResult[0], tokenField));
@@ -550,74 +279,58 @@ public class QryEval {
     return currentOp;
   }
 
-  /**
-   * Print the query results.
-   * <p/>
-   * THIS IS NOT THE CORRECT OUTPUT FORMAT.  YOU MUST CHANGE THIS
-   * METHOD SO THAT IT OUTPUTS IN THE FORMAT SPECIFIED IN THE HOMEWORK
-   * PAGE, WHICH IS:
-   * <p/>
-   * QueryID Q0 DocID Rank Score RunID
-   *
-   * @param queryName Original query.
-   * @param result    Result object generated by {@link Qryop#evaluate}.
-   * @throws IOException
-   */
-  static void printResults(String queryName, QryResult result) throws IOException {
+  private static Map<String, String> evaluateParams(String paramsFile) throws IOException {
+    Map<String, String> params = new HashMap<String, String>();
+    Scanner scan = new Scanner(new File(paramsFile));
+    String line;
+    do {
+      line = scan.nextLine();
+      String[] pair = line.split("=");
+      params.put(pair[0].trim(), pair[1].trim());
+    } while (scan.hasNext());
+    scan.close();
 
-    System.out.println(queryName + ":  ");
-    if (result.docScores.scores.size() < 1) {
-      System.out.println("\tNo results.");
-    } else {
-      for (int i = 0; i < result.docScores.scores.size(); i++) {
-        System.out.println("\t" + i + ":  "
-                + getExternalDocid(result.docScores.getDocid(i)) + ", "
-                + result.docScores.getDocidScore(i));
-      }
+    // parameters required for this example to run
+    if (!params.containsKey("indexPath")) {
+      Utility.fatalError("Error: Parameter 'indexPath' was missing.");
     }
-  }
-
-  /**
-   * Given a query string, returns the terms one at a time with stopwords
-   * removed and the terms stemmed using the Krovetz stemmer.
-   * <p/>
-   * Use this method to process raw query terms.
-   *
-   * @param query String containing query
-   * @return Array of query tokens
-   * @throws IOException
-   */
-  static String[] tokenizeQuery(String query) throws IOException {
-
-    TokenStreamComponents comp = analyzer.createComponents("dummy", new StringReader(query));
-    TokenStream tokenStream = comp.getTokenStream();
-
-    CharTermAttribute charTermAttribute = tokenStream.addAttribute(CharTermAttribute.class);
-    tokenStream.reset();
-
-    List<String> tokens = new ArrayList<String>();
-    while (tokenStream.incrementToken()) {
-      String term = charTermAttribute.toString();
-      tokens.add(term);
+    // open the index and LENGTH_STORE
+    READER = DirectoryReader.open(FSDirectory.open(new File(params.get("indexPath"))));
+    if (READER == null) {
+      Utility.fatalError(Utility.usage);
     }
-    return tokens.toArray(new String[tokens.size()]);
-  }
-
-  /**
-   * Print a message indicating the amount of memory used.  The
-   * caller can indicate whether garbage collection should be
-   * performed, which slows the program but reduces memory usage.
-   *
-   * @param gc If true, run the garbage collector before reporting.
-   * @return void
-   */
-  static void printMemoryUsage(boolean gc) {
-    Runtime runtime = Runtime.getRuntime();
-    if (gc) {
-      runtime.gc();
+    try {
+      LENGTH_STORE = new DocLengthStore(READER);
+    } catch (IOException e) {
+      Utility.fatalError("Error: DocLengthStore initialization error");
     }
-    System.out.println("Memory used:  " +
-            ((runtime.totalMemory() - runtime.freeMemory()) /
-                    (1024L * 1024L)) + " MB");
+
+    // define the retrieval model from parameter file
+    try {
+      String modelName = params.get("retrievalAlgorithm");
+      if (modelName.equalsIgnoreCase("letor"))
+        modelName = "LeToR";
+      model = (RetrievalModel) Class.forName(
+              "RetrievalModel" + modelName).newInstance();
+    } catch (Exception e) {
+      Utility.fatalError("Error: Failed to load specified retrieval model.");
+    }
+
+    if (model instanceof RetrievalModelBM25) {
+      model.setParameter("k_1", params.get("BM25:k_1"));
+      model.setParameter("k_3", params.get("BM25:k_3"));
+      model.setParameter("b", params.get("BM25:b"));
+    } else if (model instanceof RetrievalModelIndri) {
+      model.setParameter("mu", params.get("Indri:mu"));
+      model.setParameter("lambda", params.get("Indri:lambda"));
+    } else if (model instanceof RetrievalModelLeToR) {
+      model.setParameter("k_1", params.get("BM25:k_1"));
+      model.setParameter("k_3", params.get("BM25:k_3"));
+      model.setParameter("b", params.get("BM25:b"));
+      model.setParameter("mu", params.get("Indri:mu"));
+      model.setParameter("lambda", params.get("Indri:lambda"));
+    }
+
+    return params;
   }
 }
