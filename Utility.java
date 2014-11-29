@@ -86,7 +86,7 @@ public class Utility {
     featureWriter.close();
   }
 
-  public static void runClassifier(String execPath, double c, String qrelsFeatureOutputFile,
+  public static void trainClassifier(String execPath, double c, String qrelsFeatureOutputFile,
           String modelOutputFile) throws Exception {
     Process cmdProc = Runtime.getRuntime().exec(
             new String[] { execPath, "-c", String.valueOf(c), qrelsFeatureOutputFile,
@@ -111,6 +111,28 @@ public class Utility {
 
     // get the return value from the executable. 0 means success, non-zero
     // indicates a problem
+    int retValue = cmdProc.waitFor();
+    if (retValue != 0) {
+      throw new Exception("SVM Rank crashed.");
+    }
+  }
+
+  public static void runClassifier(String execPath, String qrelsFeatureOutputFile,
+          String modelFile, String predictionOutputFile) throws Exception {
+    Process cmdProc = Runtime.getRuntime().exec(
+            new String[] { execPath, qrelsFeatureOutputFile, modelFile, predictionOutputFile });
+
+    BufferedReader stdoutReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getInputStream()));
+    String line;
+    while ((line = stdoutReader.readLine()) != null) {
+      System.out.println(line);
+    }
+    BufferedReader stderrReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getErrorStream()));
+    while ((line = stderrReader.readLine()) != null) {
+      System.out.println(line);
+    }
     int retValue = cmdProc.waitFor();
     if (retValue != 0) {
       throw new Exception("SVM Rank crashed.");

@@ -14,7 +14,10 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 
 public class QryEval {
@@ -69,11 +72,11 @@ public class QryEval {
 
     Map<Integer, String> trainingQueries = Utility.readQueries(
             params.get("letor:trainingQueryFile"));
+    Map<Integer, List<RankFeature>> trainingRelevance = new HashMap<Integer, List<RankFeature>>();
 
     final boolean defaultFeatureMask[] = new boolean[18];
     Arrays.fill(defaultFeatureMask, true);
     // build training data
-    Map<Integer, List<RankFeature>> trainingRelevance = new HashMap<Integer, List<RankFeature>>();
     String line;
     BufferedReader rankFileReader = new BufferedReader(
             new FileReader(params.get("letor:trainingQrelsFile")));
@@ -102,26 +105,26 @@ public class QryEval {
       featureList.add(new RankFeature(externalId, rank, featureVector));
     }
 
-    // normalizing
+    // normalize training data
     Utility.normalize(trainingRelevance);
 
     // write features to file
     Utility.writeFeatures(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
 
     // begin training!
-    Utility.runClassifier(params.get("letor:svmRankLearnPath"),
+    Utility.trainClassifier(params.get("letor:svmRankLearnPath"),
             Double.parseDouble(params.get("letor:svmRankParamC")),
             params.get("letor:trainingFeatureVectorsFile"), params.get("letor:svmRankModelFile"));
 
-    // open query input file and read queries
+    // read test queries and evaluate
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
-
-    BufferedWriter rankWriter = null;
+    Map<Integer, List<RankFeature>> testingRelevance = new HashMap<Integer, List<RankFeature>>();
+//    BufferedWriter rankWriter = null;
     try {
       // add default query operator depending on retrieval model
       // and set parameters accordingly
       Qryop defaultQryop;
-      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
+//      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
       QryResult result;
 
       if (model instanceof RetrievalModelBM25 || model instanceof RetrievalModelLeToR) {
@@ -129,7 +132,6 @@ public class QryEval {
       } else if (model instanceof RetrievalModelIndri) {
         defaultQryop = new QryopSlAnd();
       } else {
-        // no parameter to read
         defaultQryop = new QryopSlOr();
       }
 
@@ -137,11 +139,28 @@ public class QryEval {
         int queryId = entry.getKey();
         defaultQryop.clear();
         // parse the query, then evaluate
-        Qryop parsedQuery = parseQuery(entry.getValue(), defaultQryop);
+        String query = entry.getValue();
+        String queryStems[] = Utility.tokenizeQuery(query);
+        Qryop parsedQuery = parseQuery(query, defaultQryop);
         // one simple run of evaluation
         result = parsedQuery.evaluate(model);
         result.docScores.sortAndTruncate();
-        // write to evaluation file
+        for (int i = 0; i < result.docScores.scores.size(); ++i) {
+          // update document-relevance
+          List<RankFeature> featureList;
+          if (!testingRelevance.containsKey(queryId)) {
+            featureList = new ArrayList<RankFeature>();
+            testingRelevance.put(queryId, featureList);
+          } else {
+            featureList = testingRelevance.get(queryId);
+          }
+          String externalDocid = Utility.getExternalDocid(result.docScores.getDocid(i));
+          List<Double> featureVector = Utility
+                  .createFeatureVector(externalDocid, defaultFeatureMask, queryStems, pageRanks,
+                          (RetrievalModelLeToR) model);
+          featureList.add(new RankFeature(externalDocid, i + 1, featureVector));
+        }
+        /*// write to evaluation file
         if (result.docScores.scores.size() < 1) {
           rankWriter.write(queryId + " Q0 dummy 1 0 run-1\n");
         } else {
@@ -153,16 +172,23 @@ public class QryEval {
                     result.docScores.getDocidScore(j));
             rankWriter.write(s);
           }
-        }
+        }*/
       }
     } catch (Exception e) {
       e.printStackTrace();
       Utility.fatalError("Error: Evaluation failed.");
-    } finally {
-      if (rankWriter != null) {
-        rankWriter.close();
-      }
     }
+
+    // normalize test data
+    Utility.normalize(testingRelevance);
+    // write features to file
+    Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
+
+    // re-rank using SVM-rank
+    Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
+            params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
+            params.get("letor:testingFeatureVectorsFile"));
+
 
     // print evaluation time
     final long endTime = System.currentTimeMillis();
