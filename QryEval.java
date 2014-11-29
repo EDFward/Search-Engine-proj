@@ -78,7 +78,7 @@ public class QryEval {
 
     final boolean defaultFeatureMask[] = new boolean[18];
     Arrays.fill(defaultFeatureMask, true);
-    List<RankFeature> trainingData = new ArrayList<RankFeature>();
+    Map<Integer, List<RankFeature>> trainingData = new HashMap<Integer, List<RankFeature>>();
     for (Map.Entry<Integer, String> trainingEntry : trainingQueries.entrySet()) {
       int queryId = trainingEntry.getKey();
       String[] query = Utility.tokenizeQuery(trainingEntry.getValue());
@@ -87,12 +87,20 @@ public class QryEval {
         int docId = docRelevance[0], score = docRelevance[1];
         List<Double> featureVector = Utility.createFeatureVector(docId, defaultFeatureMask, query,
                 pageRanks, (RetrievalModelLeToR) model);
-        trainingData.add(new RankFeature(queryId, score, featureVector));
+
+        List<RankFeature> featureList;
+        if (!trainingData.containsKey(queryId)) {
+          featureList = new ArrayList<RankFeature>();
+          trainingData.put(queryId, featureList);
+        } else {
+          featureList = trainingData.get(queryId);
+        }
+        featureList.add(new RankFeature(score, featureVector));
       }
     }
 
     // NORMALIZING!
-
+    Utility.normalize(trainingData);
 
     // open query input file and read queries
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
