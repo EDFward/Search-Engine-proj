@@ -94,6 +94,14 @@ public class RetrievalModelBM25 extends RetrievalModel {
     return b;
   }
 
+  /**
+   * Get score between a query and a document.
+   *
+   * @param queryStems Query words
+   * @param doc        Document term vector
+   * @return BM25 score between the query and the document
+   * @throws IOException
+   */
   public double getScore(String[] queryStems, TermVector doc) throws IOException {
     double totalScore = 0;
     String field = doc.getField();

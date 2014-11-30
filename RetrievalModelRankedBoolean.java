@@ -40,6 +40,13 @@ public class RetrievalModelRankedBoolean extends RetrievalModel {
     return false;
   }
 
+  /**
+   * Get score between a query and a document.
+   * @param queryStems Query words
+   * @param doc Document term vector
+   * @return Highest frequency the common word between document and query
+   * @throws IOException
+   */
   public double getScore(String[] queryStems, TermVector doc) throws IOException {
     int maxScore = 0;
 

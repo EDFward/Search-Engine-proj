@@ -77,7 +77,7 @@ public class QryEval {
       // read training files
       Map<Integer, String> trainingQueries = Utility
               .readQueries(params.get("letor:trainingQueryFile"));
-      Map<Integer, List<RankFeature>> trainingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
+      Map<Integer, List<RankInstance>> trainingRelevance = new LinkedHashMap<Integer, List<RankInstance>>();
 
       // read feature mask; handle null inside the method
       featureMask = Utility.readFeatureMask(params.get("letor:featureDisable"));
@@ -99,33 +99,33 @@ public class QryEval {
         String queryStems[] = Utility.tokenizeQuery(trainingQueries.get(queryId));
 
         // update document-relevance
-        List<RankFeature> featureList;
+        List<RankInstance> featureList;
         if (!trainingRelevance.containsKey(queryId)) {
-          featureList = new ArrayList<RankFeature>();
+          featureList = new ArrayList<RankInstance>();
           trainingRelevance.put(queryId, featureList);
         } else {
           featureList = trainingRelevance.get(queryId);
         }
         double[] featureVector = Utility.createFeatureVector(externalId, featureMask,
                 queryStems, pageRanks, (RetrievalModelLeToR) model);
-        featureList.add(new RankFeature(externalId, score, featureVector));
+        featureList.add(new RankInstance(externalId, score, featureVector));
       }
 
       // normalize training data
       Utility.normalize(trainingRelevance);
 
       // write features to file
-      Utility.writeFeatures(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
+      Utility.writeInstances(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
 
       // begin training!
-      Utility.trainClassifier(params.get("letor:svmRankLearnPath"),
+      Utility.trainRanker(params.get("letor:svmRankLearnPath"),
               Double.parseDouble(params.get("letor:svmRankParamC")),
               params.get("letor:trainingFeatureVectorsFile"), params.get("letor:svmRankModelFile"));
     }
 
     // read test queries and evaluate
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
-    Map<Integer, List<RankFeature>> testingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
+    Map<Integer, List<RankInstance>> testingRelevance = new LinkedHashMap<Integer, List<RankInstance>>();
     try {
       // add default query operator depending on retrieval model
       // and set parameters accordingly
@@ -153,9 +153,9 @@ public class QryEval {
         result.docScores.sortAndTruncate();
         for (int i = 0; i < result.docScores.scores.size(); ++i) {
           // update document-relevance
-          List<RankFeature> featureList;
+          List<RankInstance> featureList;
           if (!testingRelevance.containsKey(queryId)) {
-            featureList = new ArrayList<RankFeature>();
+            featureList = new ArrayList<RankInstance>();
             testingRelevance.put(queryId, featureList);
           } else {
             featureList = testingRelevance.get(queryId);
@@ -166,10 +166,10 @@ public class QryEval {
             double[] featureVector = Utility
                     .createFeatureVector(externalDocid, featureMask, queryStems, pageRanks,
                             (RetrievalModelLeToR) model);
-            featureList.add(new RankFeature(externalDocid, 0D, featureVector));
+            featureList.add(new RankInstance(externalDocid, 0D, featureVector));
           } else { // normally
             featureList
-                    .add(new RankFeature(externalDocid, result.docScores.getDocidScore(i), null));
+                    .add(new RankInstance(externalDocid, result.docScores.getDocidScore(i), null));
           }
         }
       }
@@ -183,10 +183,10 @@ public class QryEval {
       Utility.normalize(testingRelevance);
 
       // write features to file
-      Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
+      Utility.writeInstances(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
 
       // generate svm-rank scores
-      Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
+      Utility.runRanker(params.get("letor:svmRankClassifyPath"),
               params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
               params.get("letor:testingDocumentScores"));
 
@@ -194,7 +194,7 @@ public class QryEval {
       Utility.readScores(params.get("letor:testingDocumentScores"), testingRelevance);
 
       // re-rank
-      Utility.rerankFeatuerList(testingRelevance);
+      Utility.rerankInstanceList(testingRelevance);
     }
 
     // write ranks as trec_eval format
@@ -334,6 +334,12 @@ public class QryEval {
     return currentOp;
   }
 
+  /**
+   * Read and record the parameter file, and initialize corresponding resources.
+   * @param parammeterFilePath File path for parameter file.
+   * @return String maps for the parameters
+   * @throws IOException
+   */
   private static Map<String, String> evaluateParams(String parammeterFilePath) throws IOException {
     Map<String, String> params = new HashMap<String, String>();
     Scanner scan = new Scanner(new File(parammeterFilePath));

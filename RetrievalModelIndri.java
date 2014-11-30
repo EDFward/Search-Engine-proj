@@ -80,6 +80,14 @@ public class RetrievalModelIndri extends RetrievalModel {
     return mu;
   }
 
+  /**
+   * Get score between a query and a document.
+   *
+   * @param queryStems Query words
+   * @param doc        Document term vector
+   * @return Indri score between the query and the document
+   * @throws IOException
+   */
   public double getScore(String[] queryStems, TermVector doc) throws IOException {
     double totalScore = 1;
     String field = doc.getField();

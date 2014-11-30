@@ -9,20 +9,33 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Utility class for various functions
+ * Utility class for various functions such as I/O and feature creation.
  */
 public class Utility {
 
+  /**
+   * Fixed number of features.
+   */
   public static final int FEATURE_NUM = 18;
 
   /**
-   * Usage information
+   * Define a feature value as non-existent using this value.
    */
-  static String usage = "Usage:  java " + System.getProperty("sun.java.command")
-          + " paramFile\n\n";
-
   private static final double NON_EXISTENT_FEATURE = Double.MIN_VALUE;
 
+  /**
+   * Usage information.
+   */
+  public static String usage = "Usage:  java " + System.getProperty("sun.java.command")
+          + " paramFile\n\n";
+
+  /**
+   * Read queries into a hash map.
+   *
+   * @param filePath Query file path
+   * @return Query map. Key is query id and value is the query string.
+   * @throws IOException
+   */
   public static Map<Integer, String> readQueries(String filePath)
           throws IOException {
     Map<Integer, String> queryStrings = new LinkedHashMap<Integer, String>();
@@ -30,13 +43,11 @@ public class Utility {
     String line;
     try {
       queryFileReader = new BufferedReader(new FileReader(filePath));
-
       while ((line = queryFileReader.readLine()) != null) {
         line = line.trim();
         if (line.isEmpty()) {
           break;
         }
-
         String[] parts = line.split(":", 2);
         // add queryId: queryString to the map
         queryStrings.put(Integer.parseInt(parts[0]), parts[1]);
@@ -50,21 +61,25 @@ public class Utility {
     return queryStrings;
   }
 
+  /**
+   * Read page ranks for documents.
+   *
+   * @param filePath Page rank file path
+   * @return Page rank map. Key is a document's external ID and value is its page rank
+   * @throws IOException
+   */
   public static Map<String, Double> readPageRank(String filePath) throws IOException {
     Map<String, Double> pageRanks = new HashMap<String, Double>();
     BufferedReader pageRankFileReader = null;
     String line;
     try {
       pageRankFileReader = new BufferedReader(new FileReader(filePath));
-
       while ((line = pageRankFileReader.readLine()) != null) {
         line = line.trim();
         if (line.isEmpty()) {
           break;
         }
-
         String[] parts = line.split("\\s+");
-        // add queryId: queryString to the map
         pageRanks.put(parts[0], Double.parseDouble(parts[1]));
       }
     } catch (Exception e) {
@@ -77,7 +92,14 @@ public class Utility {
     return pageRanks;
   }
 
-  public static void readScores(String filePath, Map<Integer, List<RankFeature>> featureMap)
+  /**
+   * Read SVM-RANK scores for training/testing instances.
+   *
+   * @param filePath    Score file path
+   * @param instanceMap Training/testing instances
+   * @throws IOException
+   */
+  public static void readScores(String filePath, Map<Integer, List<RankInstance>> instanceMap)
           throws IOException {
     BufferedReader scoreFileReader;
     String line;
@@ -92,13 +114,19 @@ public class Utility {
     }
 
     int scoreIndex = 0;
-    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
-      for (RankFeature feature : entry.getValue()) {
+    for (Map.Entry<Integer, List<RankInstance>> entry : instanceMap.entrySet()) {
+      for (RankInstance feature : entry.getValue()) {
         feature.setScore(scores.get(scoreIndex++));
       }
     }
   }
 
+  /**
+   * Read feature mask from parameter set in parameter file.
+   *
+   * @param disableIndex String of indices like '1,2,3' indicating disabled feature index.
+   * @return Translated boolean feature mask
+   */
   public static boolean[] readFeatureMask(String disableIndex) {
     boolean featureMask[] = new boolean[FEATURE_NUM];
     Arrays.fill(featureMask, true);
@@ -109,30 +137,44 @@ public class Utility {
     return featureMask;
   }
 
-  public static void writeFeatures(String filePath, Map<Integer, List<RankFeature>> featureMap)
+  /**
+   * Write training/testing instances into a file.
+   *
+   * @param filePath    Ouput file path
+   * @param instanceMap Training/testing instances
+   * @throws IOException
+   */
+  public static void writeInstances(String filePath, Map<Integer, List<RankInstance>> instanceMap)
           throws IOException {
-    BufferedWriter featureWriter = new BufferedWriter(new FileWriter(new File(filePath)));
-    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
+    BufferedWriter instanceWriter = new BufferedWriter(new FileWriter(new File(filePath)));
+    for (Map.Entry<Integer, List<RankInstance>> entry : instanceMap.entrySet()) {
       int queryId = entry.getKey();
-      for (RankFeature feature : entry.getValue()) {
+      for (RankInstance feature : entry.getValue()) {
         String s = String.format("%f qid:%d %s# %s\n",
                 feature.getScore(),
                 queryId,
                 feature.featureString(),
                 feature.getExternalId());
-        featureWriter.write(s);
+        instanceWriter.write(s);
       }
     }
-    featureWriter.close();
+    instanceWriter.close();
   }
 
-  public static void writeRanks(String filePath, Map<Integer, List<RankFeature>> featureMap)
+  /**
+   * Write document ranks into a file.
+   *
+   * @param filePath    Output file
+   * @param instanceMap Training/testing instances
+   * @throws IOException
+   */
+  public static void writeRanks(String filePath, Map<Integer, List<RankInstance>> instanceMap)
           throws IOException {
     BufferedWriter rankWriter = new BufferedWriter(new FileWriter(new File(filePath)));
-    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
+    for (Map.Entry<Integer, List<RankInstance>> entry : instanceMap.entrySet()) {
       int queryId = entry.getKey();
       int rank = 1;
-      for (RankFeature feature : entry.getValue()) {
+      for (RankInstance feature : entry.getValue()) {
         String s = String.format("%d Q0 %s %d %.10f run-1\n",
                 queryId,
                 feature.getExternalId(),
@@ -144,12 +186,17 @@ public class Utility {
     rankWriter.close();
   }
 
-  public static void rerankFeatuerList(Map<Integer, List<RankFeature>> featureMap) {
-    for (List<RankFeature> featureList : featureMap.values()) {
-      Collections.sort(featureList, new Comparator<RankFeature>() {
+  /**
+   * Rerank testing instances using scores read from SVM-RANK.
+   *
+   * @param instanceMap Training/testing instances
+   */
+  public static void rerankInstanceList(Map<Integer, List<RankInstance>> instanceMap) {
+    for (List<RankInstance> featureList : instanceMap.values()) {
+      Collections.sort(featureList, new Comparator<RankInstance>() {
         @Override
-        public int compare(RankFeature entry1,
-                RankFeature entry2) {
+        public int compare(RankInstance entry1,
+                RankInstance entry2) {
           double score1 = entry1.getScore(), score2 = entry2.getScore();
           if (score1 < score2) {
             return 1;
@@ -163,7 +210,16 @@ public class Utility {
     }
   }
 
-  public static void trainClassifier(String execPath, double c, String qrelsFeatureOutputFile,
+  /**
+   * Call SVM-RANK to train a classifier.
+   *
+   * @param execPath               File path of SVM-RANK executable
+   * @param c                      Training parameter c for SVM-RANK
+   * @param qrelsFeatureOutputFile Input learning instances
+   * @param modelOutputFile        Model output path
+   * @throws Exception
+   */
+  public static void trainRanker(String execPath, double c, String qrelsFeatureOutputFile,
           String modelOutputFile) throws Exception {
     Process cmdProc = Runtime.getRuntime().exec(
             new String[] { execPath, "-c", String.valueOf(c), qrelsFeatureOutputFile,
@@ -194,7 +250,16 @@ public class Utility {
     }
   }
 
-  public static void runClassifier(String execPath, String qrelsFeatureOutputFile,
+  /**
+   * Call SVM-RANK to predict testing instances using trained model
+   *
+   * @param execPath               File path of SVM-RANK executable
+   * @param qrelsFeatureOutputFile Input testing instances
+   * @param modelFile              Input model for ranking
+   * @param predictionOutputFile   Output prediction file path
+   * @throws Exception
+   */
+  public static void runRanker(String execPath, String qrelsFeatureOutputFile,
           String modelFile, String predictionOutputFile) throws Exception {
     Process cmdProc = Runtime.getRuntime().exec(
             new String[] { execPath, qrelsFeatureOutputFile, modelFile, predictionOutputFile });
@@ -221,8 +286,8 @@ public class Utility {
    * external id, e.g. clueweb09-enwp00-88-09710.  If no such
    * document exists, it throws an exception.
    *
-   * @param externalId The external document id of a document.s
-   * @return An internal doc id suitable for finding document vectors etc.
+   * @param externalId The external document id of a document
+   * @return An internal doc id suitable for finding document vectors etc
    * @throws Exception
    */
   public static int getInternalDocid(String externalId) throws Exception {
@@ -335,6 +400,17 @@ public class Utility {
                     (1024L * 1024L)) + " MB");
   }
 
+  /**
+   * Create feature vector for a query / document pair.
+   *
+   * @param externalId   The external document id of a document
+   * @param featureMasks Feature mask indicating whether a feature is enabled
+   * @param queryStems   Query words
+   * @param pageRanks    Page rank map
+   * @param letorModel   Retrieval model for Learning to Rank
+   * @return An array of features for one instance
+   * @throws Exception
+   */
   public static double[] createFeatureVector(String externalId, boolean[] featureMasks,
           String[] queryStems,
           Map<String, Double> pageRanks, RetrievalModelLeToR letorModel)
@@ -446,6 +522,13 @@ public class Utility {
     return features;
   }
 
+  /**
+   * Calculate the term overlap ratio between a query and a document.
+   *
+   * @param queryStems Query words
+   * @param docStems   Document words
+   * @return Term overlap ratio
+   */
   private static double termOverlap(String[] queryStems, String[] docStems) {
     int matchedCount = 0;
     Set<String> docStemSet = new HashSet<String>(Arrays.asList(docStems));
@@ -456,10 +539,15 @@ public class Utility {
     return ((double) matchedCount) / queryStems.length;
   }
 
-  public static void normalize(Map<Integer, List<RankFeature>> featureMap) {
-    int featureSize = featureMap.values().iterator().next().get(0).featureSize();
-    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
-      List<RankFeature> featureList = entry.getValue();
+  /**
+   * Normalize the feature vectors in training/testing instances.
+   *
+   * @param instanceMap Training/testing instances
+   */
+  public static void normalize(Map<Integer, List<RankInstance>> instanceMap) {
+    int featureSize = instanceMap.values().iterator().next().get(0).featureSize();
+    for (Map.Entry<Integer, List<RankInstance>> entry : instanceMap.entrySet()) {
+      List<RankInstance> featureList = entry.getValue();
       // record min-max
       double recordMinMax[][] = new double[2][featureSize];
       for (int i = 0; i < featureSize; ++i) {
@@ -467,7 +555,7 @@ public class Utility {
         recordMinMax[1][i] = Double.MIN_VALUE;
       }
       for (int i = 0; i < featureSize; ++i) {
-        for (RankFeature feature : featureList) {
+        for (RankInstance feature : featureList) {
           double featureValue = feature.getFeature(i);
           // skip non-existent feature when recording
           if (featureValue == NON_EXISTENT_FEATURE)
@@ -481,14 +569,13 @@ public class Utility {
 
       // do normalization
       for (int i = 0; i < featureSize; ++i) {
-        for (RankFeature feature : featureList) {
+        for (RankInstance feature : featureList) {
           double diff = recordMinMax[1][i] - recordMinMax[0][i];
           double featureValue = feature.getFeature(i);
 
           if (diff == 0 || featureValue == NON_EXISTENT_FEATURE) {
             feature.setFeature(i, 0d);
-          }
-          else {
+          } else {
             feature.setFeature(i,
                     (featureValue - recordMinMax[0][i]) / diff);
           }
