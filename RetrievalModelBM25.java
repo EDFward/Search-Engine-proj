@@ -97,24 +97,20 @@ public class RetrievalModelBM25 extends RetrievalModel {
   public double getScore(String[] queryStems, TermVector doc) throws IOException {
     double totalScore = 0;
     String field = doc.getField();
-    double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
-            (float) QryEval.READER.getDocCount(field);
+    long docCount = QryEval.READER.numDocs();
+    double avgDocLen = ((double) QryEval.READER.getSumTotalTermFreq(field)) /
+            QryEval.READER.getDocCount(field);
     long docLen = QryEval.LENGTH_STORE.getDocLength(field, doc.getDocId());
-    long docCount = QryEval.READER.getDocCount(field);
-
-    // qtf is 1
-    double qtf = 1;
-    double userWeight = (k_3 + 1) * qtf / (k_3 + qtf);
 
     Set<String> queryStemSet = new HashSet<String>(Arrays.asList(queryStems));
     for (int i = 0; i < doc.stemsLength(); ++i) {
-      String stem = doc.stemString(i);
-      if (queryStemSet.contains(stem)) {
+      if (queryStemSet.contains(doc.stemString(i))) {
         int df = doc.stemDf(i);
         double idf = Math.log((docCount - df + 0.5) / (df + 0.5));
         int tf = doc.stemFreq(i);
         double normTf = tf / (tf + k_1 * (1 - b + b * docLen / avgDocLen));
-        totalScore += normTf * idf * userWeight;
+        // user weight is always 1
+        totalScore += normTf * idf;
       }
     }
     return totalScore;

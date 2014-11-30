@@ -168,11 +168,11 @@ public class QryopSlScore extends QryopSl {
     DocLengthStore docLengthStore = QryEval.LENGTH_STORE;
     String field = result.invertedList.field;
     double avgDocLen = QryEval.READER.getSumTotalTermFreq(field) /
-            (float) QryEval.READER.getDocCount(field);
+            (double) QryEval.READER.getDocCount(field);
 
     // idf
     int df = result.invertedList.df;
-    double idf = Math.log((QryEval.READER.getDocCount(field) - df + 0.5) / (df + 0.5));
+    double idf = Math.log((QryEval.READER.numDocs() - df + 0.5) / (df + 0.5));
 
     for (int i = 0; i < df; ++i) {
       int docid = result.invertedList.postings.get(i).docid;

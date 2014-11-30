@@ -67,56 +67,61 @@ public class QryEval {
     // read in the parameter file; one parameter per line in format of key=value
     Map<String, String> params = evaluateParams(args[0]);
 
-    // read PageRank file
-    Map<String, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
+    // LeToR model init
+    Map<String, Double> pageRanks = null;
+    boolean[] featureMask = null;
+    if (model instanceof RetrievalModelLeToR) {
+      // read PageRank file
+      pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
 
-    // read training files
-    Map<Integer, String> trainingQueries = Utility
-            .readQueries(params.get("letor:trainingQueryFile"));
-    Map<Integer, List<RankFeature>> trainingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
+      // read training files
+      Map<Integer, String> trainingQueries = Utility
+              .readQueries(params.get("letor:trainingQueryFile"));
+      Map<Integer, List<RankFeature>> trainingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
 
-    // read feature mask; handle null inside the method
-    boolean featureMask[] = Utility.readFeatureMask(params.get("letor:featureDisable"));
+      // read feature mask; handle null inside the method
+      featureMask = Utility.readFeatureMask(params.get("letor:featureDisable"));
 
-    // build training data
-    String line;
-    BufferedReader rankFileReader = new BufferedReader(
-            new FileReader(params.get("letor:trainingQrelsFile")));
-    while ((line = rankFileReader.readLine()) != null) {
-      line = line.trim();
-      if (line.isEmpty()) {
-        break;
+      // build training data
+      String line;
+      BufferedReader rankFileReader = new BufferedReader(
+              new FileReader(params.get("letor:trainingQrelsFile")));
+      while ((line = rankFileReader.readLine()) != null) {
+        line = line.trim();
+        if (line.isEmpty()) {
+          break;
+        }
+        String[] parts = line.split("\\s+");
+        int queryId = Integer.parseInt(parts[0]);
+        String externalId = parts[2];
+        int score = Integer.parseInt(parts[3]);
+
+        String queryStems[] = Utility.tokenizeQuery(trainingQueries.get(queryId));
+
+        // update document-relevance
+        List<RankFeature> featureList;
+        if (!trainingRelevance.containsKey(queryId)) {
+          featureList = new ArrayList<RankFeature>();
+          trainingRelevance.put(queryId, featureList);
+        } else {
+          featureList = trainingRelevance.get(queryId);
+        }
+        double[] featureVector = Utility.createFeatureVector(externalId, featureMask,
+                queryStems, pageRanks, (RetrievalModelLeToR) model);
+        featureList.add(new RankFeature(externalId, score, featureVector));
       }
-      String[] parts = line.split("\\s+");
-      int queryId = Integer.parseInt(parts[0]);
-      String externalId = parts[2];
-      int score = Integer.parseInt(parts[3]);
 
-      String queryStems[] = Utility.tokenizeQuery(trainingQueries.get(queryId));
+      // normalize training data
+      Utility.normalize(trainingRelevance);
 
-      // update document-relevance
-      List<RankFeature> featureList;
-      if (!trainingRelevance.containsKey(queryId)) {
-        featureList = new ArrayList<RankFeature>();
-        trainingRelevance.put(queryId, featureList);
-      } else {
-        featureList = trainingRelevance.get(queryId);
-      }
-      double[] featureVector = Utility.createFeatureVector(externalId, featureMask,
-              queryStems, pageRanks, (RetrievalModelLeToR) model);
-      featureList.add(new RankFeature(externalId, score, featureVector));
+      // write features to file
+      Utility.writeFeatures(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
+
+      // begin training!
+      Utility.trainClassifier(params.get("letor:svmRankLearnPath"),
+              Double.parseDouble(params.get("letor:svmRankParamC")),
+              params.get("letor:trainingFeatureVectorsFile"), params.get("letor:svmRankModelFile"));
     }
-
-    // normalize training data
-    Utility.normalize(trainingRelevance);
-
-    // write features to file
-    Utility.writeFeatures(params.get("letor:trainingFeatureVectorsFile"), trainingRelevance);
-
-    // begin training!
-    Utility.trainClassifier(params.get("letor:svmRankLearnPath"),
-            Double.parseDouble(params.get("letor:svmRankParamC")),
-            params.get("letor:trainingFeatureVectorsFile"), params.get("letor:svmRankModelFile"));
 
     // read test queries and evaluate
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
@@ -156,10 +161,16 @@ public class QryEval {
             featureList = testingRelevance.get(queryId);
           }
           String externalDocid = Utility.getExternalDocid(result.docScores.getDocid(i));
-          double[] featureVector = Utility
-                  .createFeatureVector(externalDocid, featureMask, queryStems, pageRanks,
-                          (RetrievalModelLeToR) model);
-          featureList.add(new RankFeature(externalDocid, 0D, featureVector));
+
+          if (model instanceof RetrievalModelLeToR) {
+            double[] featureVector = Utility
+                    .createFeatureVector(externalDocid, featureMask, queryStems, pageRanks,
+                            (RetrievalModelLeToR) model);
+            featureList.add(new RankFeature(externalDocid, 0D, featureVector));
+          } else { // normally
+            featureList
+                    .add(new RankFeature(externalDocid, result.docScores.getDocidScore(i), null));
+          }
         }
       }
     } catch (Exception e) {
@@ -167,22 +178,24 @@ public class QryEval {
       Utility.fatalError("Error: Evaluation failed.");
     }
 
-    // normalize test data
-    Utility.normalize(testingRelevance);
+    if (model instanceof RetrievalModelLeToR) {
+      // normalize test data
+      Utility.normalize(testingRelevance);
 
-    // write features to file
-    Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
+      // write features to file
+      Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
 
-    // generate svm-rank scores
-    Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
-            params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
-            params.get("letor:testingDocumentScores"));
+      // generate svm-rank scores
+      Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
+              params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
+              params.get("letor:testingDocumentScores"));
 
-    // read scores into testing data
-    Utility.readScores(params.get("letor:testingDocumentScores"), testingRelevance);
+      // read scores into testing data
+      Utility.readScores(params.get("letor:testingDocumentScores"), testingRelevance);
 
-    // re-rank
-    Utility.rerankFeatuerList(testingRelevance);
+      // re-rank
+      Utility.rerankFeatuerList(testingRelevance);
+    }
 
     // write ranks as trec_eval format
     Utility.writeRanks(params.get("trecEvalOutputPath"), testingRelevance);
