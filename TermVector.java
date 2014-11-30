@@ -49,6 +49,11 @@ public class TermVector {
 
     this.luceneTerms = QryEval.READER.getTermVector(docId, fieldName);
 
+    //  Check null
+    if (this.luceneTerms == null) {
+      throw new IOException();
+    }
+
     //  Allocate space for stems. The 0'th stem indicates a stopword.
 
     int stemsLength = (int) this.luceneTerms.size();

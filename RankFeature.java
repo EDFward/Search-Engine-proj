@@ -1,13 +1,11 @@
-import java.util.List;
-
 public class RankFeature {
   private String externalId;
 
   private double score;
 
-  private List<Double> featureVector;
+  private double[] featureVector;
 
-  public RankFeature(String externalId, double score, List<Double> featureVector) {
+  public RankFeature(String externalId, double score, double[] featureVector) {
     this.externalId = externalId;
     this.score = score;
     this.featureVector = featureVector;
@@ -26,21 +24,21 @@ public class RankFeature {
   }
 
   public int featureSize() {
-    return featureVector.size();
+    return featureVector.length;
   }
 
   public double getFeature(int i) {
-    return featureVector.get(i);
+    return featureVector[i];
   }
 
   public void setFeature(int i, double val) {
-    featureVector.set(i, val);
+    featureVector[i] = val;
   }
 
   public String featureString() {
     StringBuilder sb = new StringBuilder();
-    for (int i = 1; i <= featureVector.size(); ++i) {
-      sb.append(String.format("%d:%f ", i, featureVector.get(i - 1)));
+    for (int i = 1; i <= featureVector.length; ++i) {
+      sb.append(String.format("%d:%f ", i, featureVector[i-1]));
     }
     return sb.toString();
   }

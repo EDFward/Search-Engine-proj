@@ -81,7 +81,7 @@ public class RetrievalModelIndri extends RetrievalModel {
   }
 
   public double getScore(String[] queryStems, TermVector doc) throws IOException {
-    double totalScore = 0;
+    double totalScore = 1;
     String field = doc.getField();
     long docLen = QryEval.LENGTH_STORE.getDocLength(field, doc.getDocId());
     long totalTermFreq = QryEval.READER.getSumTotalTermFreq(field);
@@ -109,6 +109,6 @@ public class RetrievalModelIndri extends RetrievalModel {
     if (noMatchCount == queryStems.length)
       return 0;
     else
-      return Math.pow(totalScore, queryStems.length);
+      return Math.pow(totalScore, 1.0d / queryStems.length);
   }
 }

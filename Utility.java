@@ -18,6 +18,8 @@ public class Utility {
   static String usage = "Usage:  java " + System.getProperty("sun.java.command")
           + " paramFile\n\n";
 
+  private static final double NON_EXISTENT_FEATURE = Double.MIN_VALUE;
+
   public static Map<Integer, String> readQueries(String filePath)
           throws IOException {
     Map<Integer, String> queryStrings = new LinkedHashMap<Integer, String>();
@@ -45,8 +47,8 @@ public class Utility {
     return queryStrings;
   }
 
-  public static Map<Integer, Double> readPageRank(String filePath) throws IOException {
-    Map<Integer, Double> pageRanks = new HashMap<Integer, Double>();
+  public static Map<String, Double> readPageRank(String filePath) throws IOException {
+    Map<String, Double> pageRanks = new HashMap<String, Double>();
     BufferedReader pageRankFileReader = null;
     String line;
     try {
@@ -60,7 +62,7 @@ public class Utility {
 
         String[] parts = line.split("\\s+");
         // add queryId: queryString to the map
-        pageRanks.put(getInternalDocid(parts[0]), Double.parseDouble(parts[1]));
+        pageRanks.put(parts[0], Double.parseDouble(parts[1]));
       }
     } catch (Exception e) {
       fatalError("Error: Read page rank file failed.");
@@ -320,85 +322,102 @@ public class Utility {
                     (1024L * 1024L)) + " MB");
   }
 
-  public static List<Double> createFeatureVector(String externalId, boolean[] featureMasks,
+  public static double[] createFeatureVector(String externalId, boolean[] featureMasks,
           String[] queryStems,
-          Map<Integer, Double> pageRanks, RetrievalModelLeToR letorModel)
+          Map<String, Double> pageRanks, RetrievalModelLeToR letorModel)
           throws Exception {
     int docId = getInternalDocid(externalId);
-    List<Double> features = new ArrayList<Double>();
+    double features[] = new double[18];
+    Arrays.fill(features, NON_EXISTENT_FEATURE);
+
     if (featureMasks.length < 18) {
       fatalError("Error: wrong size for feature mask when creating features");
     }
     Document d = QryEval.READER.document(docId);
     // feature 1: spam scores
     if (featureMasks[0])
-      features.add(Double.parseDouble(d.get("score")));
+      features[0] = Double.parseDouble(d.get("score"));
     // feature 2: url depth
     String rawUrl = d.get("rawUrl");
     if (featureMasks[1]) {
-      features.add((double) (rawUrl.length() - rawUrl.replace("/", "").length()));
+      features[1] = (double) (rawUrl.length() - rawUrl.replace("/", "").length());
     }
     // feature 3: FromWikipedia score
     if (featureMasks[2]) {
-      features.add(rawUrl.contains("wikipedia.org") ? 1D : 0D);
+      features[2] = rawUrl.contains("wikipedia.org") ? 1D : 0D;
     }
     // feature 4: PageRank score
-    if (featureMasks[3]) {
-      features.add(pageRanks.containsKey(docId) ? pageRanks.get(docId) : 0D);
+    if (featureMasks[3] && pageRanks.containsKey(externalId)) {
+      features[3] = pageRanks.get(externalId);
     }
 
     RetrievalModelBM25 bm25 = letorModel.getBm25Model();
     RetrievalModelIndri indri = letorModel.getIndriModel();
 
-    TermVector doc = new TermVector(docId, "body");
-    // feature 5: BM25 score for <q, d_body>
-    if (featureMasks[4]) {
-      features.add(bm25.getScore(queryStems, doc));
-    }
-    // feature 6: Indri score for <q, d_body>
-    if (featureMasks[5]) {
-      features.add(indri.getScore(queryStems, doc));
-    }
-    // feature 7: Term overlap score for <q, d_body>
-    if (featureMasks[6]) {
-      features.add(termOverlap(queryStems, doc.stems));
-    }
-
-    doc = new TermVector(docId, "title");
-    // feature 8: BM25 score for <q, d_title>
-    if (featureMasks[7]) {
-      features.add(bm25.getScore(queryStems, doc));
-    }
-    // feature 9: Indri score for <q, d_title>
-    if (featureMasks[8]) {
-      features.add(indri.getScore(queryStems, doc));
-    }
-    // feature 10: Term overlap score for <q, d_title>
-    if (featureMasks[9]) {
-      features.add(termOverlap(queryStems, doc.stems));
+    TermVector doc = null;
+    try {
+      doc = new TermVector(docId, "body");
+      // feature 5: BM25 score for <q, d_body>
+      if (featureMasks[4]) {
+        features[4] = bm25.getScore(queryStems, doc);
+      }
+      // feature 6: Indri score for <q, d_body>
+      if (featureMasks[5]) {
+        features[5] = indri.getScore(queryStems, doc);
+      }
+      // feature 7: Term overlap score for <q, d_body>
+      if (featureMasks[6]) {
+        features[6] = termOverlap(queryStems, doc.stems);
+      }
+    } catch (IOException ignored) {
     }
 
-    doc = new TermVector(docId, "url");
-    // feature 11: BM25 score for <q, d_url>
-    if (featureMasks[10])
-      features.add(bm25.getScore(queryStems, doc));
-    // feature 12: Indri score for <q, d_url>
-    if (featureMasks[11])
-      features.add(indri.getScore(queryStems, doc));
-    // feature 13: Term overlap score for <q, d_url>
-    if (featureMasks[12])
-      features.add(termOverlap(queryStems, doc.stems));
+    try {
+      doc = new TermVector(docId, "title");
+      // feature 8: BM25 score for <q, d_title>
+      if (featureMasks[7]) {
+        features[7] = bm25.getScore(queryStems, doc);
+      }
+      // feature 9: Indri score for <q, d_title>
+      if (featureMasks[8]) {
+        features[8] = indri.getScore(queryStems, doc);
+      }
+      // feature 10: Term overlap score for <q, d_title>
+      if (featureMasks[9]) {
+        features[9] = termOverlap(queryStems, doc.stems);
+      }
+    } catch (IOException ignored) {
+    }
 
-    doc = new TermVector(docId, "inlink");
-    // feature 14: BM25 score for <q, d_url>
-    if (featureMasks[13])
-      features.add(bm25.getScore(queryStems, doc));
-    // feature 15: Indri score for <q, d_url>
-    if (featureMasks[14])
-      features.add(indri.getScore(queryStems, doc));
-    // feature 16: Term overlap score for <q, d_url>
-    if (featureMasks[15])
-      features.add(termOverlap(queryStems, doc.stems));
+    try {
+      doc = new TermVector(docId, "url");
+      // feature 11: BM25 score for <q, d_url>
+      if (featureMasks[10])
+        features[10] = bm25.getScore(queryStems, doc);
+      // feature 12: Indri score for <q, d_url>
+      if (featureMasks[11])
+        features[11] = indri.getScore(queryStems, doc);
+      // feature 13: Term overlap score for <q, d_url>
+      if (featureMasks[12])
+        features[12] = termOverlap(queryStems, doc.stems);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      doc = new TermVector(docId, "inlink");
+      // feature 14: BM25 score for <q, d_inlink>
+      if (featureMasks[13])
+        features[13] = bm25.getScore(queryStems, doc);
+      // feature 15: Indri score for <q, d_inlink>
+      if (featureMasks[14])
+        features[14] = indri.getScore(queryStems, doc);
+      // feature 16: Term overlap score for <q, d_inlink>
+      if (featureMasks[15])
+        features[15] = termOverlap(queryStems, doc.stems);
+    } catch (IOException ignored) {
+    }
+
+    // TODO: custom features
 
     return features;
   }
@@ -426,6 +445,9 @@ public class Utility {
       for (int i = 0; i < featureSize; ++i) {
         for (RankFeature feature : featureList) {
           double featureValue = feature.getFeature(i);
+          // skip non-existent feature when recoding
+          if (featureValue == NON_EXISTENT_FEATURE)
+            continue;
           if (featureValue < recordMinMax[0][i])
             recordMinMax[0][i] = featureValue;
           if (featureValue > recordMinMax[1][i])
@@ -437,10 +459,12 @@ public class Utility {
       for (int i = 0; i < featureSize; ++i) {
         for (RankFeature feature : featureList) {
           double diff = recordMinMax[1][i] - recordMinMax[0][i];
-          if (diff == 0)
+          double featureValue = feature.getFeature(i);
+
+          if (diff == 0 || featureValue == NON_EXISTENT_FEATURE) {
             feature.setFeature(i, 0d);
+          }
           else {
-            double featureValue = feature.getFeature(i);
             feature.setFeature(i,
                     (featureValue - recordMinMax[0][i]) / diff);
           }

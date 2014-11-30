@@ -68,7 +68,7 @@ public class QryEval {
     Map<String, String> params = evaluateParams(args[0]);
 
     // read PageRank file
-    Map<Integer, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
+    Map<String, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
 
     Map<Integer, String> trainingQueries = Utility.readQueries(
             params.get("letor:trainingQueryFile"));
@@ -101,7 +101,7 @@ public class QryEval {
       } else {
         featureList = trainingRelevance.get(queryId);
       }
-      List<Double> featureVector = Utility.createFeatureVector(externalId, defaultFeatureMask,
+      double[] featureVector = Utility.createFeatureVector(externalId, defaultFeatureMask,
               queryStems, pageRanks, (RetrievalModelLeToR) model);
       featureList.add(new RankFeature(externalId, score, featureVector));
     }
@@ -154,7 +154,7 @@ public class QryEval {
             featureList = testingRelevance.get(queryId);
           }
           String externalDocid = Utility.getExternalDocid(result.docScores.getDocid(i));
-          List<Double> featureVector = Utility
+          double[] featureVector = Utility
                   .createFeatureVector(externalDocid, defaultFeatureMask, queryStems, pageRanks,
                           (RetrievalModelLeToR) model);
           featureList.add(new RankFeature(externalDocid, 0D, featureVector));
