@@ -76,6 +76,7 @@ public class QryEval {
 
     final boolean defaultFeatureMask[] = new boolean[18];
     Arrays.fill(defaultFeatureMask, true);
+
     // build training data
     String line;
     BufferedReader rankFileReader = new BufferedReader(
@@ -88,7 +89,7 @@ public class QryEval {
       String[] parts = line.split("\\s+");
       int queryId = Integer.parseInt(parts[0]);
       String externalId = parts[2];
-      int rank = Integer.parseInt(parts[3]);
+      int score = Integer.parseInt(parts[3]);
 
       String queryStems[] = Utility.tokenizeQuery(trainingQueries.get(queryId));
 
@@ -102,7 +103,7 @@ public class QryEval {
       }
       List<Double> featureVector = Utility.createFeatureVector(externalId, defaultFeatureMask,
               queryStems, pageRanks, (RetrievalModelLeToR) model);
-      featureList.add(new RankFeature(externalId, rank, featureVector));
+      featureList.add(new RankFeature(externalId, score, featureVector));
     }
 
     // normalize training data
@@ -118,13 +119,11 @@ public class QryEval {
 
     // read test queries and evaluate
     Map<Integer, String> testQueries = Utility.readQueries(params.get("queryFilePath"));
-    Map<Integer, List<RankFeature>> testingRelevance = new HashMap<Integer, List<RankFeature>>();
-//    BufferedWriter rankWriter = null;
+    Map<Integer, List<RankFeature>> testingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
     try {
       // add default query operator depending on retrieval model
       // and set parameters accordingly
       Qryop defaultQryop;
-//      rankWriter = new BufferedWriter(new FileWriter(new File(params.get("trecEvalOutputPath"))));
       QryResult result;
 
       if (model instanceof RetrievalModelBM25 || model instanceof RetrievalModelLeToR) {
@@ -158,21 +157,8 @@ public class QryEval {
           List<Double> featureVector = Utility
                   .createFeatureVector(externalDocid, defaultFeatureMask, queryStems, pageRanks,
                           (RetrievalModelLeToR) model);
-          featureList.add(new RankFeature(externalDocid, i + 1, featureVector));
+          featureList.add(new RankFeature(externalDocid, 0D, featureVector));
         }
-        /*// write to evaluation file
-        if (result.docScores.scores.size() < 1) {
-          rankWriter.write(queryId + " Q0 dummy 1 0 run-1\n");
-        } else {
-          for (int j = 0; j < result.docScores.scores.size(); ++j) {
-            String s = String.format("%d Q0 %s %d %.10f run-1\n",
-                    queryId,                                        // query id
-                    Utility.getExternalDocid(result.docScores.getDocid(j)), // external id
-                    j + 1,                                          // rank
-                    result.docScores.getDocidScore(j));
-            rankWriter.write(s);
-          }
-        }*/
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -184,11 +170,19 @@ public class QryEval {
     // write features to file
     Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
 
-    // re-rank using SVM-rank
+    // generate svm-rank scores
     Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
             params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
             params.get("letor:testingFeatureVectorsFile"));
 
+    // read scores into testing data
+    Utility.readScores(params.get("letor:testingDocumentScores"), testingRelevance);
+
+    // re-rank
+    Utility.rerankFeatuerList(testingRelevance);
+
+    // write ranks as trec_eval format
+    Utility.writeRanks(params.get("trecEvalOutputPath"), testingRelevance);
 
     // print evaluation time
     final long endTime = System.currentTimeMillis();
@@ -324,9 +318,9 @@ public class QryEval {
     return currentOp;
   }
 
-  private static Map<String, String> evaluateParams(String paramsFile) throws IOException {
+  private static Map<String, String> evaluateParams(String parammeterFilePath) throws IOException {
     Map<String, String> params = new HashMap<String, String>();
-    Scanner scan = new Scanner(new File(paramsFile));
+    Scanner scan = new Scanner(new File(parammeterFilePath));
     String line;
     do {
       line = scan.nextLine();

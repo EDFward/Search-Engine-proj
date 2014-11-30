@@ -18,13 +18,13 @@ public class Utility {
   static String usage = "Usage:  java " + System.getProperty("sun.java.command")
           + " paramFile\n\n";
 
-  public static Map<Integer, String> readQueries(String queryFile)
+  public static Map<Integer, String> readQueries(String filePath)
           throws IOException {
     Map<Integer, String> queryStrings = new LinkedHashMap<Integer, String>();
     BufferedReader queryFileReader = null;
     String line;
     try {
-      queryFileReader = new BufferedReader(new FileReader(queryFile));
+      queryFileReader = new BufferedReader(new FileReader(filePath));
 
       while ((line = queryFileReader.readLine()) != null) {
         line = line.trim();
@@ -45,12 +45,12 @@ public class Utility {
     return queryStrings;
   }
 
-  public static Map<Integer, Double> readPageRank(String pageRankFile) throws IOException {
+  public static Map<Integer, Double> readPageRank(String filePath) throws IOException {
     Map<Integer, Double> pageRanks = new HashMap<Integer, Double>();
     BufferedReader pageRankFileReader = null;
     String line;
     try {
-      pageRankFileReader = new BufferedReader(new FileReader(pageRankFile));
+      pageRankFileReader = new BufferedReader(new FileReader(filePath));
 
       while ((line = pageRankFileReader.readLine()) != null) {
         line = line.trim();
@@ -72,18 +72,80 @@ public class Utility {
     return pageRanks;
   }
 
+  public static void readScores(String filePath, Map<Integer, List<RankFeature>> featureMap)
+          throws IOException {
+    BufferedReader scoreFileReader;
+    String line;
+    List<Double> scores = new ArrayList<Double>();
+    scoreFileReader = new BufferedReader(new FileReader(filePath));
+    while ((line = scoreFileReader.readLine()) != null) {
+      line = line.trim();
+      if (line.isEmpty()) {
+        break;
+      }
+      scores.add(Double.parseDouble(line));
+    }
+
+    int scoreIndex = 0;
+    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
+      for (RankFeature feature : entry.getValue()) {
+        feature.setScore(scores.get(scoreIndex++));
+      }
+    }
+  }
+
   public static void writeFeatures(String filePath, Map<Integer, List<RankFeature>> featureMap)
           throws IOException {
     BufferedWriter featureWriter = new BufferedWriter(new FileWriter(new File(filePath)));
     for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
       int queryId = entry.getKey();
       for (RankFeature feature : entry.getValue()) {
-        featureWriter.write(String
-                .format("%d qid:%d %s# %s\n", feature.getRank(), queryId, feature.featureString(),
-                        feature.getExternalId()));
+        String s = String.format("%f qid:%d %s# %s\n",
+                feature.getScore(),
+                queryId,
+                feature.featureString(),
+                feature.getExternalId());
+        featureWriter.write(s);
       }
     }
     featureWriter.close();
+  }
+
+  public static void writeRanks(String filePath, Map<Integer, List<RankFeature>> featureMap)
+          throws IOException {
+    BufferedWriter rankWriter = new BufferedWriter(new FileWriter(new File(filePath)));
+    for (Map.Entry<Integer, List<RankFeature>> entry : featureMap.entrySet()) {
+      int queryId = entry.getKey();
+      int rank = 1;
+      for (RankFeature feature : entry.getValue()) {
+        String s = String.format("%d Q0 %s %d %.10f run-1\n",
+                queryId,
+                feature.getExternalId(),
+                rank++,
+                feature.getScore());
+        rankWriter.write(s);
+      }
+    }
+    rankWriter.close();
+  }
+
+  public static void rerankFeatuerList(Map<Integer, List<RankFeature>> featureMap) {
+    for (List<RankFeature> featureList : featureMap.values()) {
+      Collections.sort(featureList, new Comparator<RankFeature>() {
+        @Override
+        public int compare(RankFeature entry1,
+                RankFeature entry2) {
+          double score1 = entry1.getScore(), score2 = entry2.getScore();
+          if (score1 < score2) {
+            return 1;
+          } else if (score1 > score2) {
+            return -1;
+          } else {
+            return 0;
+          }
+        }
+      });
+    }
   }
 
   public static void trainClassifier(String execPath, double c, String qrelsFeatureOutputFile,

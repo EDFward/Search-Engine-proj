@@ -3,18 +3,22 @@ import java.util.List;
 public class RankFeature {
   private String externalId;
 
-  private int rank;
+  private double score;
 
   private List<Double> featureVector;
 
-  public RankFeature(String externalId, int rank, List<Double> featureVector) {
+  public RankFeature(String externalId, double score, List<Double> featureVector) {
     this.externalId = externalId;
-    this.rank = rank;
+    this.score = score;
     this.featureVector = featureVector;
   }
 
-  public int getRank() {
-    return rank;
+  public void setScore(double score) {
+    this.score = score;
+  }
+
+  public double getScore() {
+    return score;
   }
 
   public String getExternalId() {
