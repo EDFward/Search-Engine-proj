@@ -70,12 +70,13 @@ public class QryEval {
     // read PageRank file
     Map<String, Double> pageRanks = Utility.readPageRank(params.get("letor:pageRankFile"));
 
-    Map<Integer, String> trainingQueries = Utility.readQueries(
-            params.get("letor:trainingQueryFile"));
-    Map<Integer, List<RankFeature>> trainingRelevance = new HashMap<Integer, List<RankFeature>>();
+    // read training files
+    Map<Integer, String> trainingQueries = Utility
+            .readQueries(params.get("letor:trainingQueryFile"));
+    Map<Integer, List<RankFeature>> trainingRelevance = new LinkedHashMap<Integer, List<RankFeature>>();
 
-    final boolean defaultFeatureMask[] = new boolean[18];
-    Arrays.fill(defaultFeatureMask, true);
+    // read feature mask; handle null inside the method
+    boolean featureMask[] = Utility.readFeatureMask(params.get("letor:featureDisable"));
 
     // build training data
     String line;
@@ -101,7 +102,7 @@ public class QryEval {
       } else {
         featureList = trainingRelevance.get(queryId);
       }
-      double[] featureVector = Utility.createFeatureVector(externalId, defaultFeatureMask,
+      double[] featureVector = Utility.createFeatureVector(externalId, featureMask,
               queryStems, pageRanks, (RetrievalModelLeToR) model);
       featureList.add(new RankFeature(externalId, score, featureVector));
     }
@@ -142,7 +143,8 @@ public class QryEval {
         String queryStems[] = Utility.tokenizeQuery(query);
         Qryop parsedQuery = parseQuery(query, defaultQryop);
         // one simple run of evaluation
-        result = parsedQuery.evaluate(model);
+        result = parsedQuery.evaluate((model instanceof RetrievalModelLeToR) ?
+                ((RetrievalModelLeToR) model).getBm25Model() : model);
         result.docScores.sortAndTruncate();
         for (int i = 0; i < result.docScores.scores.size(); ++i) {
           // update document-relevance
@@ -155,7 +157,7 @@ public class QryEval {
           }
           String externalDocid = Utility.getExternalDocid(result.docScores.getDocid(i));
           double[] featureVector = Utility
-                  .createFeatureVector(externalDocid, defaultFeatureMask, queryStems, pageRanks,
+                  .createFeatureVector(externalDocid, featureMask, queryStems, pageRanks,
                           (RetrievalModelLeToR) model);
           featureList.add(new RankFeature(externalDocid, 0D, featureVector));
         }
@@ -167,13 +169,14 @@ public class QryEval {
 
     // normalize test data
     Utility.normalize(testingRelevance);
+
     // write features to file
     Utility.writeFeatures(params.get("letor:testingFeatureVectorsFile"), testingRelevance);
 
     // generate svm-rank scores
     Utility.runClassifier(params.get("letor:svmRankClassifyPath"),
             params.get("letor:testingFeatureVectorsFile"), params.get("letor:svmRankModelFile"),
-            params.get("letor:testingFeatureVectorsFile"));
+            params.get("letor:testingDocumentScores"));
 
     // read scores into testing data
     Utility.readScores(params.get("letor:testingDocumentScores"), testingRelevance);

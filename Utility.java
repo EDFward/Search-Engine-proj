@@ -12,6 +12,9 @@ import java.util.*;
  * Utility class for various functions
  */
 public class Utility {
+
+  public static final int FEATURE_NUM = 18;
+
   /**
    * Usage information
    */
@@ -94,6 +97,16 @@ public class Utility {
         feature.setScore(scores.get(scoreIndex++));
       }
     }
+  }
+
+  public static boolean[] readFeatureMask(String disableIndex) {
+    boolean featureMask[] = new boolean[FEATURE_NUM];
+    Arrays.fill(featureMask, true);
+    if (disableIndex != null)
+      for (String i : disableIndex.split(",")) {
+        featureMask[Integer.parseInt(i) - 1] = false;
+      }
+    return featureMask;
   }
 
   public static void writeFeatures(String filePath, Map<Integer, List<RankFeature>> featureMap)
@@ -327,10 +340,10 @@ public class Utility {
           Map<String, Double> pageRanks, RetrievalModelLeToR letorModel)
           throws Exception {
     int docId = getInternalDocid(externalId);
-    double features[] = new double[18];
+    double features[] = new double[FEATURE_NUM];
     Arrays.fill(features, NON_EXISTENT_FEATURE);
 
-    if (featureMasks.length < 18) {
+    if (featureMasks.length < FEATURE_NUM) {
       fatalError("Error: wrong size for feature mask when creating features");
     }
     Document d = QryEval.READER.document(docId);
@@ -354,7 +367,7 @@ public class Utility {
     RetrievalModelBM25 bm25 = letorModel.getBm25Model();
     RetrievalModelIndri indri = letorModel.getIndriModel();
 
-    TermVector doc = null;
+    TermVector doc;
     try {
       doc = new TermVector(docId, "body");
       // feature 5: BM25 score for <q, d_body>
@@ -445,7 +458,7 @@ public class Utility {
       for (int i = 0; i < featureSize; ++i) {
         for (RankFeature feature : featureList) {
           double featureValue = feature.getFeature(i);
-          // skip non-existent feature when recoding
+          // skip non-existent feature when recording
           if (featureValue == NON_EXISTENT_FEATURE)
             continue;
           if (featureValue < recordMinMax[0][i])
