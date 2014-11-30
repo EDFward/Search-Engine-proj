@@ -367,9 +367,12 @@ public class Utility {
     RetrievalModelBM25 bm25 = letorModel.getBm25Model();
     RetrievalModelIndri indri = letorModel.getIndriModel();
 
-    TermVector doc;
+    TermVector doc, docBody = null;
     try {
       doc = new TermVector(docId, "body");
+      // keep a record for feature 18
+      docBody = doc;
+
       // feature 5: BM25 score for <q, d_body>
       if (featureMasks[4]) {
         features[4] = bm25.getScore(queryStems, doc);
@@ -427,10 +430,18 @@ public class Utility {
       // feature 16: Term overlap score for <q, d_inlink>
       if (featureMasks[15])
         features[15] = termOverlap(queryStems, doc.stems);
+      // feature 17: inlink number
+      if (featureMasks[16]) {
+        features[16] = doc.stemsLength();
+      }
     } catch (IOException ignored) {
     }
 
-    // TODO: custom features
+    // feature 18: ranked boolean score in body field
+    RetrievalModelRankedBoolean rankedBoolean = letorModel.getRankedBooleanModel();
+    if (featureMasks[17] && docBody != null) {
+      features[17] = rankedBoolean.getScore(queryStems, docBody);
+    }
 
     return features;
   }

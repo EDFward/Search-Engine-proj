@@ -7,6 +7,16 @@ public class RetrievalModelLeToR extends RetrievalModel {
 
   private RetrievalModelBM25 bm25Model;
 
+  private RetrievalModelIndri indriModel;
+
+  private RetrievalModelRankedBoolean rbModel;
+
+  public RetrievalModelLeToR() {
+    bm25Model = new RetrievalModelBM25();
+    indriModel = new RetrievalModelIndri();
+    rbModel = new RetrievalModelRankedBoolean();
+  }
+
   public RetrievalModelBM25 getBm25Model() {
     return bm25Model;
   }
@@ -15,11 +25,8 @@ public class RetrievalModelLeToR extends RetrievalModel {
     return indriModel;
   }
 
-  private RetrievalModelIndri indriModel;
-
-  public RetrievalModelLeToR() {
-    bm25Model = new RetrievalModelBM25();
-    indriModel = new RetrievalModelIndri();
+  public RetrievalModelRankedBoolean getRankedBooleanModel() {
+    return rbModel;
   }
 
   /**
